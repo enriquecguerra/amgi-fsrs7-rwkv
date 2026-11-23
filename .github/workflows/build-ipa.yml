@@ -1,20 +1,11 @@
 name: Build Unsigned IPA
 
-# Builds run for version tags only: pushing to main builds nothing. A tag
-# such as `1.0` or `v1.0` builds the IPA and publishes it as a release.
 on:
-  workflow_dispatch:        # manual trigger from Actions UI (artifact, no release)
-  push:
-    tags:
-      - 'v*'
-      - '[0-9]*'
+  workflow_dispatch:
 
-# Cancel in-progress runs for dispatch only. Tag-triggered release runs use a
-# tag-specific group with cancel-in-progress disabled so a re-tag (or rapid
-# push) doesn't abort a release publish mid-flight.
 concurrency:
-  group: build-ipa-${{ github.ref_type == 'tag' && format('tag-{0}', github.ref) || github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -33,9 +24,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 60
 
-    # GITHUB_TOKEN scopes — minimal set required for tag-triggered release publish.
     permissions:
-      contents: write
+      contents: read
 
     steps:
       # ── 1. Select Xcode 26.3 (release build, not RC) ─────────────
@@ -261,9 +251,6 @@ jobs:
 
           cat build-summary.md
 
-          # Export SHA256 for the release step below
-          echo "IPA_SHA256=${IPA_SHA256}" >> "$GITHUB_ENV"
-
       # ── 14. Upload build summary as workflow artifact ─────────────
       - name: Upload Build Summary
         if: always()
@@ -272,63 +259,3 @@ jobs:
           name: build-summary
           path: amgi/build-summary.md
           retention-days: 7
-
-      # ── 15. Publish GitHub Release (tag builds only) ──────────────
-      # Runs only when the workflow was triggered by a version tag push.
-      # workflow_dispatch runs still upload the artifact above but do not
-      # create a release.
-
-      # The release notes are the annotated tag's own message, so what a reader
-      # sees on the release page is what the tagger wrote — not a template that
-      # only explains sideloading. The install/verify boilerplate is appended
-      # below it. An unannotated tag yields an empty message here, and the
-      # release falls back to the boilerplate alone.
-      - name: Compose release notes from the tag
-        if: github.ref_type == 'tag'
-        run: |
-          # actions/checkout fetches a tag push as `+<sha>:refs/tags/<name>`,
-          # which lands a *lightweight* tag — the annotated object never reaches
-          # the runner, and %(contents) falls back to the commit message. Re-fetch
-          # the tag itself so the tagger's text is what gets published.
-          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
-          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > /tmp/release-notes.md
-          cat >> /tmp/release-notes.md <<NOTES
-
-          ---
-
-          Unsigned iOS IPA build. Sign locally with [AltStore](https://altstore.io/) or [Sideloadly](https://sideloadly.io/) using your own Apple ID.
-
-          ### Install
-
-          1. Download \`AmgiApp-unsigned.ipa\` from this release.
-          2. Open AltStore or Sideloadly on your computer.
-          3. Drag the IPA into the tool and sign with your Apple ID.
-          4. Install on your device.
-
-          Free Apple IDs: install lasts 7 days. Paid Apple Developer Program: 1 year.
-
-          ### Verify
-
-          \`\`\`
-          shasum -a 256 AmgiApp-unsigned.ipa
-          \`\`\`
-
-          Expected SHA256: \`${IPA_SHA256}\`
-
-          ### License
-
-          Amgi is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html).
-          It includes the [ankitects/anki](https://github.com/ankitects/anki) Rust backend (also AGPL-3.0).
-
-          Source: https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_SHA}
-          NOTES
-
-      - name: Publish GitHub Release
-        if: github.ref_type == 'tag' && env.IPA_SHA256 != '' && env.IPA_SHA256 != 'N/A'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
-          files: /tmp/AmgiApp-unsigned.ipa
-          body_path: /tmp/release-notes.md
