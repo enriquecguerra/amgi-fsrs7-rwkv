@@ -8,6 +8,13 @@ OUTPUT_DIR="$ROOT_DIR/AnkiRustLib.xcframework"
 STAGE_DIR="$BRIDGE_DIR/target/xcframework-stage"
 HEADER="$BRIDGE_DIR/include/anki_bridge.h"
 
+# AMGI uses the host collection lock for its Swift/Rust bridge, as on the
+# previous upstream pin. The desktop source keeps this method crate-private.
+EMBEDDING_PATCH="$SCRIPT_DIR/anki-embedding.patch"
+if ! git -C "$ROOT_DIR/anki-upstream" apply --reverse --check "$EMBEDDING_PATCH" 2>/dev/null; then
+    git -C "$ROOT_DIR/anki-upstream" apply "$EMBEDDING_PATCH"
+fi
+
 export PROTOC="${PROTOC:-$(which protoc 2>/dev/null || echo /opt/homebrew/bin/protoc)}"
 
 # anki_proto's build script writes the protobuf descriptor pool and anki's build

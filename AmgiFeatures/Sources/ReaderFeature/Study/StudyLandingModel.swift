@@ -56,12 +56,15 @@ final class StudyLandingModel {
                 )
             }
 
-            // 2. Total counts for the summary ring (sum of all decks, not just due)
-            let totalDue = allDecks.reduce(0) { $0 + $1.counts.total }
-            let totalNew = allDecks.reduce(0) { $0 + $1.counts.newCount }
-            let totalLearn = allDecks.reduce(0) { $0 + $1.counts.learnCount }
-            let totalReview = allDecks.reduce(0) { $0 + $1.counts.reviewCount }
-            let deckCount = dueDecks.count
+            // Parent counts already include their subdecks and apply the
+            // parent's limits. Use top-level counts for the Today summary.
+            let dueTopLevelDecks = tree.filter { $0.counts.total > 0 }
+            let counts = dueTopLevelDecks.reduce(into: DeckCounts.zero) { total, deck in
+                total.newCount += deck.counts.newCount
+                total.learnCount += deck.counts.learnCount
+                total.reviewCount += deck.counts.reviewCount
+            }
+            let deckCount = dueTopLevelDecks.count
 
             // 3. Build subtitle label from current weekday + deck count
             let weekday = Date().formatted(.dateTime.weekday(.wide))
@@ -73,10 +76,10 @@ final class StudyLandingModel {
             }
 
             let summary = StudySummaryData(
-                totalDue: totalDue,
-                newCount: totalNew,
-                learnCount: totalLearn,
-                reviewCount: totalReview,
+                totalDue: counts.total,
+                newCount: counts.newCount,
+                learnCount: counts.learnCount,
+                reviewCount: counts.reviewCount,
                 todayLabel: "Today",
                 subtitleLabel: subtitleLabel,
                 deckCount: deckCount

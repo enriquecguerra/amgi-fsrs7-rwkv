@@ -95,19 +95,19 @@ enum DecksMethod {
 /// `AnkiBackend.SchedulerMethod` but are kept here so service code
 /// never names the raw `UInt32` constants directly.
 enum SchedulerMethod {
-    static let getQueuedCards: UInt32 = 5
-    static let answerCard: UInt32 = 7
-    static let extendLimits: UInt32 = 12
-    static let buryOrSuspendCards: UInt32 = 17
-    static let emptyFilteredDeck: UInt32 = 18
-    static let rebuildFilteredDeck: UInt32 = 19
-    static let scheduleCardsAsNew: UInt32 = 20
-    static let setDueDate: UInt32 = 22
-    static let computeFsrsParams: UInt32 = 34
-    static let simulateFsrsReview: UInt32 = 38
-    static let simulateFsrsWorkload: UInt32 = 39
-    static let evaluateParams: UInt32 = 41
-    static let evaluateParamsLegacy: UInt32 = 42
+    static let getQueuedCards: UInt32 = 6
+    static let answerCard: UInt32 = 8
+    static let extendLimits: UInt32 = 13
+    static let buryOrSuspendCards: UInt32 = 18
+    static let emptyFilteredDeck: UInt32 = 19
+    static let rebuildFilteredDeck: UInt32 = 20
+    static let scheduleCardsAsNew: UInt32 = 21
+    static let setDueDate: UInt32 = 23
+    static let computeFsrsParams: UInt32 = 35
+    static let simulateFsrsReview: UInt32 = 39
+    static let simulateFsrsWorkload: UInt32 = 40
+    static let evaluateParams: UInt32 = 42
+    static let evaluateParamsLegacy: UInt32 = 43
 }
 
 enum DeckConfigMethod {

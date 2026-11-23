@@ -172,13 +172,23 @@ struct ReviewCardArea: View {
 
     @ViewBuilder
     private func cardSurface(isBack: Bool) -> some View {
+        let cardID = session.currentCardId
         switch session.resolvedMode {
         case .native(let front, let back):
-            NativeCardView(
-                content: isBack ? back : front,
-                isAnswerSide: isBack,
-                mediaFolder: mediaFolder
-            )
+            GeometryReader { geometry in
+                NativeCardView(
+                    content: isBack ? back : front,
+                    isAnswerSide: isBack,
+                    mediaFolder: mediaFolder
+                )
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    SpatialTapGesture().onEnded { tap in
+                        guard geometry.size.width > 0 else { return }
+                        handleCardTap(tap.location.x / geometry.size.width, cardID: cardID, isBack: isBack)
+                    }
+                )
+            }
         case .html:
             VStack(spacing: 0) {
                 CardWebView(
@@ -202,12 +212,27 @@ struct ReviewCardArea: View {
                     onLookupRequested: tapLookup && !session.requiresTypedAnswerInput ? { text, _, _ in
                         if let text, !text.isEmpty { lookupQuery = text }
                     } : nil,
-                    onShowAnswerRequested: { session.revealAnswer() }
+                    onShowAnswerRequested: { session.revealAnswer() },
+                    reviewCardID: cardID?.rawValue,
+                    onReviewTap: { fraction in
+                        handleCardTap(fraction, cardID: cardID, isBack: isBack)
+                    }
                 )
             }
         }
     }
 
+    private func handleCardTap(_ horizontalFraction: CGFloat, cardID: CardID?, isBack: Bool) {
+        guard shortcutsEnabled, !showRenderModeSheet, !session.isAdvancing,
+              let cardID, cardID == session.currentCardId, isBack == session.showAnswer,
+              horizontalFraction >= 0, horizontalFraction < 1 else { return }
+
+        if isBack {
+            session.answer(rating: horizontalFraction < 1.0 / 3.0 ? .again : .good)
+        } else {
+            session.revealAnswer()
+        }
+    }
 
     private func playNativeAudio() {
         guard case .native(let front, let back) = session.resolvedMode else { return }

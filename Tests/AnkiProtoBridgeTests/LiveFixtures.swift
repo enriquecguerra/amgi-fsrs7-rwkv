@@ -69,7 +69,7 @@ enum RwkvModel {
                 .deletingLastPathComponent()   // AnkiProtoBridgeTests
                 .deletingLastPathComponent()   // Tests
                 .deletingLastPathComponent()   // repo root
-                .appendingPathComponent("anki-upstream/qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin")
+                .appendingPathComponent("anki-upstream/qt/aqt/rwkv_inference/sm92/weights.f32.bin")
                 .path,
         ]
         return candidates

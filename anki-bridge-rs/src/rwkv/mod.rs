@@ -26,6 +26,7 @@ mod views;
 mod workload;
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::OnceLock;
@@ -37,8 +38,9 @@ use anki::collection::Collection;
 use anki::rwkv::ReviewInput;
 use anki::rwkv::ReviewState;
 use anki::rwkv::ReviewStateOwned;
-use anki::rwkv::RwkvInference;
-use anki::rwkv::RwkvInferenceState;
+use anki::rwkv::ModelKind;
+use anki::rwkv::RwkvRuntime;
+use anki::rwkv::RwkvRuntimeState;
 use anki::rwkv::StatePrecision;
 use anki::services::CardsService;
 use anki::services::CollectionService;
@@ -403,7 +405,7 @@ impl From<&Identity> for pb::RwkvHistoricalReviewIdentity {
 }
 
 struct Model {
-    inference: RwkvInference,
+    inference: RwkvRuntime,
     path: PathBuf,
     precision: StatePrecision,
     precision_name: String,
@@ -447,9 +449,9 @@ struct UndoFrame {
     /// The identity the answer was replayed under.
     identity: AnswerIdentity,
     before: ReviewStateOwned,
-    runtime: RwkvInferenceState,
+    runtime: RwkvRuntimeState,
     after: ReviewStateOwned,
-    runtime_after: RwkvInferenceState,
+    runtime_after: RwkvRuntimeState,
 }
 
 /// `_rwkv_review_queue_score_maps` for one deck: card id to retrievability
@@ -554,15 +556,9 @@ impl Engine {
             .as_ref()
             .is_none_or(|m| m.path != path || m.precision_name != precision_name);
         if reload {
-            let bytes = std::fs::read(&path)?;
-            let digest = hex_sha256(&bytes);
+            let digest = runtime_digest(&path)?;
             self.model = Some(Model {
-                inference: RwkvInference::load_with_precision(
-                    path.clone(),
-                    TARGET_RETENTION,
-                    MAX_INTERVAL_DAYS,
-                    precision,
-                )?,
+                inference: load_runtime(&path, precision)?,
                 path,
                 precision,
                 precision_name,
@@ -740,7 +736,7 @@ impl Engine {
         Ok(())
     }
 
-    fn model_mut(&mut self) -> Result<&mut RwkvInference> {
+    fn model_mut(&mut self) -> Result<&mut RwkvRuntime> {
         self.model
             .as_mut()
             .map(|m| &mut m.inference)
@@ -752,12 +748,7 @@ impl Engine {
             .model
             .as_mut()
             .ok_or_else(|| Error("model not loaded".into()))?;
-        model.inference = RwkvInference::load_with_precision(
-            model.path.clone(),
-            TARGET_RETENTION,
-            MAX_INTERVAL_DAYS,
-            model.precision,
-        )?;
+        model.inference = load_runtime(&model.path, model.precision)?;
         Ok(())
     }
 
@@ -1259,7 +1250,7 @@ impl Engine {
         }
 
         let model = self.model_mut()?;
-        let state = model.warm_up_state(&input);
+        let state = model.warm_up_state(&input)?;
         let Some(output) = model
             .review(input, review_state(&state))
             .ok()
@@ -1448,7 +1439,7 @@ impl Engine {
         let base_state = review_state_for_kind(state_kind(Some(current_state)), card.ctype.into());
         let state = review_state_for_live_context(
             base_state,
-            latest_eligible_review(backend, card.id)?,
+            latest_eligible_review(backend, card)?,
             Timing {
                 days_elapsed: timing.days_elapsed.into(),
                 next_day_at: timing.next_day_at,
@@ -1481,8 +1472,15 @@ impl Engine {
         self.redo.clear();
 
         let mut state_invalidated = false;
-        if current {
-            match canonical_answer_input(backend, card.id)? {
+        // Answering a reset new card can persist a history cutoff. The old
+        // reviews are no longer valid input for either checkpoint.
+        let restarted = card.ctype == 0
+            && get_card(backend, card.id)?.rwkv_history_reset_after != card.rwkv_history_reset_after;
+        if restarted {
+            self.forget_state();
+            state_invalidated = true;
+        } else if current {
+            match canonical_answer_input(backend, card)? {
                 CanonicalAnswer::NotInHistory => {
                     // E.g. a preview-only filtered answer: the history skips
                     // it, so the state is still current.
@@ -1509,7 +1507,7 @@ impl Engine {
                         };
                         let record_calibration = self.calibration_epoch_current();
                         let model = self.model_mut()?;
-                        let before = model.warm_up_state(&input);
+                        let before = model.warm_up_state(&input)?;
                         // `_rwkv_answer_calibration_prediction`: queried
                         // before the answer updates the state.
                         let calibration_prediction = record_calibration
@@ -1518,16 +1516,20 @@ impl Engine {
                         let runtime = model.state_for_card(input.card_id);
                         let answered = input.clone();
                         model.review(input, review_state(&before))?;
-                        let frame = undo_counter.map(|counter| UndoFrame {
-                            counter,
-                            review_id,
-                            card_id: answered.card_id,
-                            identity,
-                            before,
-                            runtime,
-                            after: model.warm_up_state(&answered),
-                            runtime_after: model.state_for_card(answered.card_id),
-                        });
+                        let frame = if let Some(counter) = undo_counter {
+                            Some(UndoFrame {
+                                counter,
+                                review_id,
+                                card_id: answered.card_id,
+                                identity,
+                                before,
+                                runtime,
+                                after: model.warm_up_state(&answered)?,
+                                runtime_after: model.state_for_card(answered.card_id),
+                            })
+                        } else {
+                            None
+                        };
                         if let Some(prediction) = calibration_prediction {
                             calibration::record_answer_prediction(backend, review_id, prediction);
                         }
@@ -1786,7 +1788,7 @@ impl Engine {
             frame.identity.preset_id,
             clone_state(&frame.before),
         )?;
-        model.restore_state(&frame.runtime);
+        model.restore_state(&frame.runtime)?;
         self.own_review_ids.pop();
         self.own_review_identities.pop();
         // Revalidate (cheaply) against the post-undo collection.
@@ -1836,7 +1838,7 @@ impl Engine {
             frame.identity.preset_id,
             clone_state(&frame.after),
         )?;
-        model.restore_state(&frame.runtime_after);
+        model.restore_state(&frame.runtime_after)?;
         self.own_review_ids.push(frame.review_id);
         self.own_review_identities.push((card_id, frame.identity));
         // `apply_reviewer_redo_card_ids`.
@@ -1945,11 +1947,14 @@ enum CanonicalAnswer {
 /// (`RwkvHistoricalReviewInputs`): state from the revlog type, elapsed time
 /// from the previous retained answer, the stored duration. Identity fields
 /// are filled in by the caller.
-fn canonical_answer_input(backend: &Backend, card_id: i64) -> Result<CanonicalAnswer> {
+fn canonical_answer_input(backend: &Backend, card: &Card) -> Result<CanonicalAnswer> {
     let rows = db_query::<(i64, i64, i64, i64, i64)>(
         backend,
-        "select id, ease, type, factor, time from revlog where cid = ? order by id",
-        vec![serde_json::json!(card_id)],
+        "select id, ease, type, factor, time from revlog where cid = ? and id > ? order by id",
+        vec![
+            serde_json::json!(card.id),
+            serde_json::json!(card.rwkv_history_reset_after.unwrap_or_default()),
+        ],
     )?;
     let Some(&(review_id, ease, kind, factor, time)) = rows.last() else {
         return Ok(CanonicalAnswer::NotInHistory);
@@ -1992,7 +1997,7 @@ fn canonical_answer_input(backend: &Backend, card_id: i64) -> Result<CanonicalAn
     Ok(CanonicalAnswer::Input {
         review_id,
         input: ReviewInput {
-            card_id,
+            card_id: card.id,
             note_id: None,
             deck_id: None,
             preset_id: None,
@@ -2058,7 +2063,7 @@ impl LiveContext {
                 next_day_at: timing.next_day_at,
             },
             now_secs: now_millis().div_euclid(1000),
-            previous: latest_eligible_review(backend, card.id)?,
+            previous: latest_eligible_review(backend, card)?,
             synthetic: synthetic.get(&card.id).copied(),
             preset_id: preset
                 .as_ref()
@@ -2596,17 +2601,25 @@ impl Drop for ReplayGuard {
 }
 
 /// `_latest_eligible_review_for_card`.
-fn latest_eligible_review(backend: &Backend, card_id: i64) -> Result<Option<PreviousReview>> {
+fn latest_eligible_review(backend: &Backend, card: &Card) -> Result<Option<PreviousReview>> {
+    if card.ctype == 0 {
+        return Ok(None);
+    }
     let sql = format!(
-        "select id, ease, type from revlog where cid = ? and {} order by id desc limit 1",
+        "select id, ease, type from revlog where cid = ? and id > ? and {} order by id desc limit 1",
         historical_answer_condition("revlog")
     );
-    Ok(
-        db_query::<(i64, i64, i64)>(backend, &sql, vec![serde_json::json!(card_id)])?
-            .into_iter()
-            .next()
-            .map(|(id, ease, kind)| PreviousReview { id, ease, kind }),
-    )
+    Ok(db_query::<(i64, i64, i64)>(
+        backend,
+        &sql,
+        vec![
+            serde_json::json!(card.id),
+            serde_json::json!(card.rwkv_history_reset_after.unwrap_or_default()),
+        ],
+    )?
+    .into_iter()
+    .next()
+    .map(|(id, ease, kind)| PreviousReview { id, ease, kind }))
 }
 
 fn review_exists(backend: &Backend, review_id: i64) -> Result<bool> {
@@ -2652,6 +2665,44 @@ fn now_millis() -> i64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as i64)
+}
+
+fn instant_model_path(curve_path: &Path) -> Option<PathBuf> {
+    let folder = curve_path.parent()?;
+    if folder.file_name()? != "sm92" {
+        return None;
+    }
+    Some(folder.parent()?.join("sm98").join("weights.f32.bin"))
+}
+
+fn load_runtime(curve_path: &Path, precision: StatePrecision) -> Result<RwkvRuntime> {
+    if let Some(instant_path) = instant_model_path(curve_path) {
+        Ok(RwkvRuntime::load_paired(
+            curve_path.to_path_buf(),
+            instant_path,
+            TARGET_RETENTION,
+            MAX_INTERVAL_DAYS,
+            precision,
+            ModelKind::Sm92,
+            ModelKind::Sm98,
+        )?)
+    } else {
+        Ok(RwkvRuntime::load_with_precision(
+            curve_path.to_path_buf(),
+            TARGET_RETENTION,
+            MAX_INTERVAL_DAYS,
+            precision,
+            ModelKind::Legacy,
+        )?)
+    }
+}
+
+fn runtime_digest(curve_path: &Path) -> Result<String> {
+    let mut bytes = std::fs::read(curve_path)?;
+    if let Some(instant_path) = instant_model_path(curve_path) {
+        bytes.extend(std::fs::read(instant_path)?);
+    }
+    Ok(hex_sha256(&bytes))
 }
 
 fn hex_sha256(bytes: &[u8]) -> String {

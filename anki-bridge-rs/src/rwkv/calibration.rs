@@ -647,7 +647,7 @@ pub(super) fn new_lineage() -> String {
 /// `answered_review_retrievability`: the answer's input queried, as the
 /// historical replay records it, on the state before the answer.
 pub(super) fn answer_prediction(
-    model: &mut RwkvInference,
+    model: &mut RwkvRuntime,
     input: &ReviewInput,
     before: &ReviewStateOwned,
 ) -> Option<f32> {
@@ -682,7 +682,7 @@ fn valid_prediction(value: f32) -> bool {
 
 /// `warm_up(..., prediction_recorder=writer.record)` in chunks.
 fn replay_recording(
-    model: &mut RwkvInference,
+    model: &mut RwkvRuntime,
     backend: &Backend,
     history: &pb::RwkvHistoricalReviewInputsResponse,
     roles: &HashMap<i64, String>,

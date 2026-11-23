@@ -17,9 +17,6 @@ import AppShared
 /// layout, and per-page padding details are deferred — they need their
 /// own pass and weren't gating any current user flow.
 struct ReaderSettingsView: View {
-    @Shared(.appStorage(ReaderPreferences.Keys.showTab))
-    private var showTab: Bool = true
-
     @Shared(.appStorage(ReaderPreferences.Keys.tapLookup))
     private var tapLookup: Bool = true
 
@@ -105,7 +102,7 @@ struct ReaderSettingsView: View {
 
     var body: some View {
         SettingsPage {
-            readerTabSection
+            lookupSection
             displaySection
             themeSection
             toolbarSection
@@ -115,21 +112,12 @@ struct ReaderSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Reader tab & lookup
+    // MARK: - Reader lookup
 
-    /// "Reader Tab" and "Lookup" were a section each for one toggle apiece;
-    /// the design's grouping reads better with both under one header.
-    private var readerTabSection: some View {
+    private var lookupSection: some View {
         Group {
             SettingsSectionHeader(title: "Reader")
             SettingsGroup {
-                SettingsToggleRow(
-                    title: "Show Reader tab",
-                    systemImage: "book",
-                    tone: .accent,
-                    isOn: Binding($showTab)
-                )
-                SettingsSeparator()
                 SettingsToggleRow(
                     title: "Tap word to look up",
                     systemImage: "hand.tap",

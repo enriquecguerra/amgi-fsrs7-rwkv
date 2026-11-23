@@ -215,11 +215,13 @@ impl Engine {
         for chunk in inputs.chunks(FULL_PREDICTION_CHUNK) {
             let requests = chunk
                 .iter()
-                .map(|input| ReviewPredictionRequest {
-                    state: model.warm_up_state(input),
-                    input: input.clone(),
+                .map(|input| {
+                    Ok(ReviewPredictionRequest {
+                        state: model.warm_up_state(input)?,
+                        input: input.clone(),
+                    })
                 })
-                .collect();
+                .collect::<std::io::Result<Vec<_>>>()?;
             out.extend(model.predict_many(requests)?);
         }
         Ok(out)
@@ -408,6 +410,7 @@ impl Engine {
                     include_suspended_review: true,
                     include_disabled_decks: false,
                     include_new_cards: false,
+                    include_comparison_data: false,
                 },
             )
         })?;

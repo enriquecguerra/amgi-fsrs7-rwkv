@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 unwrap_used = "warn"
 
 [dependencies]
-anki = { path = "../anki-upstream/rslib", features = ["rustls"] }
+anki = { path = "../anki-upstream/rslib", features = ["rustls", "rwkv-sm40"] }
 anki_proto = { path = "../anki-upstream/rslib/proto" }
 prost = "0.13"
 serde = { version = "1", features = ["derive"] }

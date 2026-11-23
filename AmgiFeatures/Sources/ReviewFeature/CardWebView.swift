@@ -40,6 +40,8 @@ struct CardWebView {
     let onCardBackgroundColorChange: ((Color, Bool) -> Void)?
     let onLookupRequested: ((String?, String?, CGPoint) -> Void)?
     let onShowAnswerRequested: (() -> Void)?
+    let reviewCardID: Int64?
+    let onReviewTap: ((CGFloat) -> Void)?
 
     init(
         html: String,
@@ -61,7 +63,9 @@ struct CardWebView {
         onAudioStateChange: ((Bool) -> Void)? = nil,
         onCardBackgroundColorChange: ((Color, Bool) -> Void)? = nil,
         onLookupRequested: ((String?, String?, CGPoint) -> Void)? = nil,
-        onShowAnswerRequested: (() -> Void)? = nil
+        onShowAnswerRequested: (() -> Void)? = nil,
+        reviewCardID: Int64? = nil,
+        onReviewTap: ((CGFloat) -> Void)? = nil
     ) {
         self.html = html
         self.cardCSS = cardCSS
@@ -83,6 +87,8 @@ struct CardWebView {
         self.onCardBackgroundColorChange = onCardBackgroundColorChange
         self.onLookupRequested = onLookupRequested
         self.onShowAnswerRequested = onShowAnswerRequested
+        self.reviewCardID = reviewCardID
+        self.onReviewTap = onReviewTap
     }
 
     func makeCoordinator() -> CardWebViewCoordinator {
@@ -105,6 +111,13 @@ struct CardWebView {
         config.userContentController.add(coordinator, name: "amgiCardTheme")
         config.userContentController.add(coordinator, name: "amgiLookupText")
         config.userContentController.add(coordinator, name: "amgiShowAnswer")
+        config.userContentController.add(coordinator, contentWorld: Self.reviewTapWorld, name: "amgiReviewTap")
+        config.userContentController.addUserScript(WKUserScript(
+            source: Self.reviewTapScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true,
+            in: Self.reviewTapWorld
+        ))
 
         config.userContentController.addUserScript(WKUserScript(
             source: LookupExtractionScript.source,
@@ -133,6 +146,9 @@ struct CardWebView {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "amgiCardTheme")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "amgiLookupText")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "amgiShowAnswer")
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: "amgiReviewTap", contentWorld: Self.reviewTapWorld
+        )
         coordinator.stopTTS()
     }
 
@@ -151,17 +167,21 @@ struct CardWebView {
         let pageSignature = "\(isDarkMode)"
         // `bottomContentInset` joins the signature because it is now carried as
         // body padding in the show-card script rather than as a scroll inset.
-        let contentSignature = "\(autoplayEnabled)|\(isAnswerSide)|\(lookupPopupEnabled)|\(dictionaryScanLength)|\(replayMode.rawValue)|\(cardOrdinal)|\(alignTop)|\(showInlineAudioReplayButtons)|\(Int(bottomContentInset))|\(cardCSS.hashValue)|\(html.hashValue)|\(prefetchHTML?.hashValue ?? 0)"
+        let contentSignature = "\(reviewCardID ?? 0)|\(onReviewTap != nil)|\(autoplayEnabled)|\(isAnswerSide)|\(lookupPopupEnabled)|\(dictionaryScanLength)|\(replayMode.rawValue)|\(cardOrdinal)|\(alignTop)|\(showInlineAudioReplayButtons)|\(Int(bottomContentInset))|\(cardCSS.hashValue)|\(html.hashValue)|\(prefetchHTML?.hashValue ?? 0)"
 
         // Bookkeeping that has to track every render, expensive or not.
         coordinator.openLinksExternally = openLinksExternally
         coordinator.currentWebView = webView
+        coordinator.onReviewTap = onReviewTap
         webView.overrideUserInterfaceStyle = isDarkMode ? .dark : .light
 
         let pageChanged = coordinator.lastPageSignature != pageSignature
         let contentChanged = coordinator.lastContentSignature != contentSignature
 
         if pageChanged || contentChanged {
+            // Only a tap on the currently displayed render can grade it.
+            let reviewTapToken = onReviewTap == nil ? "" : UUID().uuidString
+            coordinator.reviewTapToken = reviewTapToken
             // Convert Anki [sound:filename.mp3] tags to <audio> HTML elements.
             // The Rust renderer keeps these tags literal; the client must expand them.
             let processedHTML = Self.deferCardScripts(in:
@@ -193,7 +213,8 @@ struct CardWebView {
                 replayMode: replayMode.rawValue,
                 alignTop: alignTop,
                 bodyPaddingBottom: bodyPaddingBottom,
-                cardPaddingBottom: cardPaddingBottom
+                cardPaddingBottom: cardPaddingBottom,
+                reviewTapToken: reviewTapToken
             )
             // Only when the card content actually changes. Unconditionally,
             // any unrelated re-render — including the audio callback writing

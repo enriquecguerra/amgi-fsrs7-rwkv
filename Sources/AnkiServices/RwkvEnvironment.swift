@@ -9,20 +9,22 @@
 package import AnkiBackend
 import Foundation
 
-package enum RwkvEnvironment {
-    /// The bundled weights; nil in previews, tests and the watch app, which
-    /// therefore never touch RWKV.
+public enum RwkvEnvironment {
+    /// The bundled SM92 Curve checkpoint. The bridge pairs it with SM98
+    /// in the adjacent directory. Previews, tests, and watchOS omit both.
     package static let modelPath: String? = Bundle.main.path(
-        forResource: "RWKV_trained_on_5000_10000",
-        ofType: "bin"
+        forResource: "weights.f32",
+        ofType: "bin",
+        inDirectory: "sm92"
     )
 
-    /// `UserDefaults` key for the state precision: "f32", "int8" or "int4".
-    /// The desktop's profile setting of the same name; int8 is its default.
-    package static let precisionKey = "rwkvStatePrecision"
+    /// The Small pair starts with the Windows default on existing installs
+    /// and on new installs. The previous Big model used a separate key.
+    public static let precisionKey = "rwkvSmallStatePrecision"
+    public static let defaultPrecision = "cards_int4_notes_int8"
 
     package static var precision: String {
-        UserDefaults.standard.string(forKey: precisionKey) ?? "int8"
+        UserDefaults.standard.string(forKey: precisionKey) ?? defaultPrecision
     }
 
     /// The persisted model state lives beside the collection it describes.

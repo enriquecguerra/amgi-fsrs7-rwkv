@@ -123,6 +123,7 @@ impl Engine {
                     include_suspended_review: false,
                     include_disabled_decks: false,
                     include_new_cards: req.new_limit > 0,
+                    include_comparison_data: false,
                 },
             )
         })?;

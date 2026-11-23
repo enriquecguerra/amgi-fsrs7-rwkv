@@ -8,32 +8,18 @@
 public import SwiftUI
 import Theme
 
-/// Library hero card. Built on `AmgiHeroSummary`. Wraps it to supply the
-/// streak pill (top-right decoration slot) and the CTA + sparkline
-/// (footer slot).
-///
-/// `data.totalDue == 0` disables the CTA; the rest still renders so
-/// the user sees their streak + sparkline.
+/// Library summary with a review button and a 14-day activity sparkline.
 public struct LibraryHeroCard: View {
     let data: HeroData
     let onStartReview: () -> Void
-    /// True while the review-history fetch that feeds `streak` and
-    /// `last14Days` is still in flight. `totalDue` and `deckCount` come from
-    /// the deck tree and are real immediately, so the card renders at once and
-    /// only the history-derived decorations are shown as placeholders — a
-    /// confident "0 day streak" that flips to 36 a second later is a worse
-    /// answer than an obvious placeholder.
-    let activityPending: Bool
 
     @Environment(\.palette) private var palette
 
     public init(
         data: HeroData,
-        activityPending: Bool = false,
         onStartReview: @escaping () -> Void
     ) {
         self.data = data
-        self.activityPending = activityPending
         self.onStartReview = onStartReview
     }
 
@@ -43,10 +29,7 @@ public struct LibraryHeroCard: View {
             bigNumber: "\(data.totalDue)",
             subtitle: subtitleText,
             background: heroGradient,
-            decoration: {
-                StreakBadge(days: data.streak)
-                    .redacted(reason: activityPending ? .placeholder : [])
-            },
+            decoration: { EmptyView() },
             footer: {
                 VStack(spacing: 12) {
                     Button(action: onStartReview) {
@@ -60,9 +43,9 @@ public struct LibraryHeroCard: View {
                     .foregroundStyle(.white)
                     .disabled(data.totalDue == 0)
 
-                    SparklineBars(values: data.last14Days)
+                    SparklineBars(values: data.last14Days ?? Array(repeating: 0, count: 14))
                         .frame(height: 28)
-                        .redacted(reason: activityPending ? .placeholder : [])
+                        .redacted(reason: data.last14Days == nil ? .placeholder : [])
                 }
             }
         )
@@ -78,28 +61,6 @@ public struct LibraryHeroCard: View {
             end: Color(red: 0.37, green: 0.36, blue: 0.91), // #5E5CE6 Apple indigo
             angle: .degrees(155)
         )
-    }
-}
-
-// MARK: - Streak pill
-
-private struct StreakBadge: View {
-    let days: Int
-
-    var body: some View {
-        if days > 0 {
-            HStack(spacing: 4) {
-                Image(systemName: "flame.fill")
-                    .amgiFont(size: 12, weight: .bold, relativeTo: .footnote)
-                Text("\(days)")
-                    .amgiFont(size: 14, weight: .semibold, relativeTo: .footnote)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .foregroundStyle(.white)
-            .background(.white.opacity(0.22), in: Capsule())
-        }
     }
 }
 
@@ -136,7 +97,6 @@ private struct SparklineBars: View {
         data: HeroData(
             totalDue: 680,
             deckCount: 7,
-            streak: 36,
             last14Days: [3, 5, 2, 7, 6, 9, 4, 8, 6, 5, 7, 3, 8, 5]
         ),
         onStartReview: {}
@@ -151,7 +111,6 @@ private struct SparklineBars: View {
         data: HeroData(
             totalDue: 0,
             deckCount: 4,
-            streak: 12,
             last14Days: [3, 5, 0, 0, 6, 9, 4, 8, 6, 0, 7, 3, 8, 0]
         ),
         onStartReview: {}
@@ -161,13 +120,12 @@ private struct SparklineBars: View {
     .environment(\.palette, .vividLight)
 }
 
-#Preview("Streak zero — badge hidden") {
+#Preview("Activity loading") {
     LibraryHeroCard(
         data: HeroData(
             totalDue: 42,
             deckCount: 3,
-            streak: 0,
-            last14Days: Array(repeating: 0, count: 14)
+            last14Days: nil
         ),
         onStartReview: {}
     )

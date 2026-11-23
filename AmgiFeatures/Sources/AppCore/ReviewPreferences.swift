@@ -38,7 +38,6 @@ public enum ReviewPreferences {
 
 public enum ReaderPreferences {
     public enum Keys {
-        public static let showTab = "reader_pref_show_tab"
         public static let tapLookup = "reader_pref_tap_lookup"
         public static let deckID = "reader_pref_deck_id"
         public static let notetypeID = "reader_pref_notetype_id"

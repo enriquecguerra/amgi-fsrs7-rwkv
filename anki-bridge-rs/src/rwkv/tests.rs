@@ -7,8 +7,8 @@
 //! encoded (state kinds, elapsed time, day offsets, durations, presets) shows
 //! up here.
 //!
-//! Needs the model weights: `RWKV_MODEL=/path/to/RWKV_trained_on_5000_10000.bin`,
-//! or `anki-upstream` checked out next to this crate. Skipped otherwise.
+//! Needs the bundled Small pair in `anki-upstream`. Set `RWKV_MODEL` to
+//! override the model path for local tests.
 
 #![allow(clippy::unwrap_used)]
 
@@ -39,9 +39,61 @@ fn model_path() -> Option<String> {
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../anki-upstream/qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin")
+                .join("../anki-upstream/qt/aqt/rwkv_inference/sm92/weights.f32.bin")
         });
     path.exists().then(|| path.to_string_lossy().into_owned())
+}
+
+#[test]
+fn small_pair_uses_sm98_for_instant_and_sm92_for_curve() {
+    let Some(fixture) = fixture("small-pair", 4) else {
+        return;
+    };
+    let curve_path = Path::new(&fixture.model);
+    let Some(instant_path) = instant_model_path(curve_path) else {
+        return;
+    };
+    let precision = StatePrecision::parse("cards_int4_notes_int8").unwrap();
+    let mut pair = load_runtime(curve_path, precision).unwrap();
+    assert!(pair.is_paired());
+    let mut curve = RwkvRuntime::load_with_precision(
+        curve_path.to_path_buf(),
+        TARGET_RETENTION,
+        MAX_INTERVAL_DAYS,
+        precision,
+        ModelKind::Sm92,
+    )
+    .unwrap();
+    let mut instant = RwkvRuntime::load_with_precision(
+        instant_path,
+        TARGET_RETENTION,
+        MAX_INTERVAL_DAYS,
+        precision,
+        ModelKind::Sm98,
+    )
+    .unwrap();
+    let params = history_params(&fixture.backend, "cards_int4_notes_int8").unwrap();
+    let history = history_inputs(&fixture.backend, &params).unwrap();
+    let inputs: Vec<_> = history.reviews.iter().map(history_review_input).collect();
+    let mut query = inputs.last().unwrap().clone();
+    query.is_query = true;
+    query.ease = None;
+    query.duration_millis = None;
+    query.current_elapsed_days = Some(3);
+    query.current_elapsed_seconds = Some(3 * 86_400);
+    for runtime in [&mut pair, &mut curve, &mut instant] {
+        runtime.warm_up_reviews(inputs.clone(), false).unwrap();
+    }
+    let predict = |runtime: &mut RwkvRuntime| {
+        let state = runtime.warm_up_state(&query).unwrap();
+        runtime.review(query.clone(), review_state(&state)).unwrap()
+    };
+    let paired = predict(&mut pair);
+    let sm92 = predict(&mut curve);
+    let sm98 = predict(&mut instant);
+    assert_eq!(paired.retrievability, sm98.retrievability);
+    assert_eq!(paired.intervals, sm92.intervals);
+    assert_eq!(paired.curve_retrievability, sm92.curve_retrievability);
 }
 
 struct Fixture {
@@ -2158,13 +2210,8 @@ fn calibration_rows(fx: &Fixture) -> Vec<(i64, f64, String, i64, String)> {
 fn recorded_replay_predictions(fx: &Fixture) -> HashMap<i64, f32> {
     let params = history_params(&fx.backend, "int8").unwrap();
     let history = history_inputs(&fx.backend, &params).unwrap();
-    let mut model = RwkvInference::load_with_precision(
-        PathBuf::from(&fx.model),
-        TARGET_RETENTION,
-        MAX_INTERVAL_DAYS,
-        StatePrecision::parse("int8").unwrap(),
-    )
-    .unwrap();
+    let mut model =
+        load_runtime(Path::new(&fx.model), StatePrecision::parse("int8").unwrap()).unwrap();
     let mut out = HashMap::new();
     for chunk in history.reviews.chunks(WARM_UP_CHUNK) {
         let inputs = chunk.iter().map(history_review_input).collect();
@@ -2739,13 +2786,8 @@ fn rwkv_memorised_history_builds_caches_and_resumes() {
     // input queried today (within the UInt16 rounding).
     let params = history_params(&fx.backend, "int8").unwrap();
     let response = history_inputs(&fx.backend, &params).unwrap();
-    let mut runtime = RwkvInference::load_with_precision(
-        fx.model.clone().into(),
-        TARGET_RETENTION,
-        MAX_INTERVAL_DAYS,
-        StatePrecision::parse("int8").unwrap(),
-    )
-    .unwrap();
+    let mut runtime =
+        load_runtime(Path::new(&fx.model), StatePrecision::parse("int8").unwrap()).unwrap();
     let reviews: Vec<ReviewInput> = response.reviews.iter().map(history_review_input).collect();
     runtime.warm_up_reviews(reviews.clone(), false).unwrap();
     let mut last: std::collections::BTreeMap<i64, ReviewInput> = Default::default();

@@ -14,7 +14,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: 8
+    CURRENT_PROJECT_VERSION: 9
     SWIFT_STRICT_CONCURRENCY: complete
     # Must match the SPM packages: NonisolatedNonsendingByDefault changes the
     # mangling of `nonisolated async` function types, so the app target has to
@@ -166,8 +166,13 @@ targets:
         type: folder
       - path: Resources/EPUBReader
         type: folder
-      # RWKV scheduler weights, straight from the anki-upstream fork.
-      - path: ../anki-upstream/qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin
+      # The Windows fork's Small pair. Preserve the model directories so
+      # the runtime can use each checkpoint's companion files.
+      - path: ../anki-upstream/qt/aqt/rwkv_inference/sm92
+        type: folder
+        buildPhase: resources
+      - path: ../anki-upstream/qt/aqt/rwkv_inference/sm98
+        type: folder
         buildPhase: resources
     dependencies:
       - package: AmgiFeatures

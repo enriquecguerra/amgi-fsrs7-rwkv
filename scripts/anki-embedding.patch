@@ -1,0 +1,12 @@
+diff --git a/rslib/src/backend/mod.rs b/rslib/src/backend/mod.rs
+--- a/rslib/src/backend/mod.rs
++++ b/rslib/src/backend/mod.rs
+@@ -114,7 +114,7 @@
+     /// If collection is open, run the provided closure while holding
+     /// the mutex.
+     /// If collection is not open, return an error.
+-    pub(crate) fn with_col<F, T>(&self, func: F) -> Result<T>
++    pub fn with_col<F, T>(&self, func: F) -> Result<T>
+     where
+         F: FnOnce(&mut Collection) -> Result<T>,
+     {

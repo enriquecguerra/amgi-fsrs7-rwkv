@@ -16,6 +16,7 @@ __AMGI_BASE_TAG__
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
     }
+    html:has(#qa[data-amgi-review-tap]) { cursor: pointer; }
     body {
         font-family: -apple-system, system-ui;
         font-size: 18px; line-height: 1.5;
@@ -176,6 +177,9 @@ function amgiCardLookupPayloadAt(x, y, scanLength) {
 
 document.addEventListener('click', function(event) {
     var state = amgiCardState();
+    // On the review surface a single tap reveals or grades. The reviewer
+    // toolbar still offers manual lookup.
+    if (state.reviewTapToken) return;
     if (state.renderedAt && Date.now() - state.renderedAt < 300) return;
     var payload = amgiCardLookupPayloadAt(event.clientX, event.clientY, state.dictionaryScanLength);
     if (!payload) return;
@@ -1014,6 +1018,7 @@ async function amgiUpdateQA(html, state, onupdate, onshown) {
 
     var qa = document.getElementById('qa');
     if (!qa) return;
+    delete qa.dataset.amgiReviewTap;
 
     stopAllSystemAudio();
     var normalizedHTML = amgiNormalizeMathJaxMarkup(html || '');
@@ -1081,6 +1086,7 @@ async function amgiUpdateQA(html, state, onupdate, onshown) {
 
         amgiSetupImageOcclusion();
         await amgiRunHooks(window.onShownHook);
+        if (state && state.reviewTapToken) qa.dataset.amgiReviewTap = state.reviewTapToken;
     } finally {
         // Avoid a forced fade-in on every flip/next-card update; it reads
         // as a content reload once MathJax and scripts are involved.
@@ -1096,12 +1102,13 @@ function amgiQueueAction(action) {
 }
 
 // ── Public API called from Swift via evaluateJavaScript ───────────────
-function _showQuestion(html, prefetchHTML, bodyclass, autoplay, replayMode, alignTop, bodyPaddingBottom, cardPaddingBottom, lookupPopupEnabled, dictionaryScanLength) {
+function _showQuestion(html, prefetchHTML, bodyclass, autoplay, replayMode, alignTop, bodyPaddingBottom, cardPaddingBottom, lookupPopupEnabled, dictionaryScanLength, reviewTapToken) {
     amgiQueueAction(function() {
         return amgiUpdateQA(
             html,
             {
                 isAnswerSide: false,
+                reviewTapToken: reviewTapToken,
                 lookupPopupEnabled: !!lookupPopupEnabled,
                 dictionaryScanLength: dictionaryScanLength ?? 16,
                 bodyClass: bodyclass,
@@ -1141,12 +1148,13 @@ function _showQuestion(html, prefetchHTML, bodyclass, autoplay, replayMode, alig
     });
 }
 
-function _showAnswer(html, bodyclass, autoplay, replayMode, alignTop, bodyPaddingBottom, cardPaddingBottom, lookupPopupEnabled, dictionaryScanLength) {
+function _showAnswer(html, bodyclass, autoplay, replayMode, alignTop, bodyPaddingBottom, cardPaddingBottom, lookupPopupEnabled, dictionaryScanLength, reviewTapToken) {
     amgiQueueAction(function() {
         return amgiUpdateQA(
             html,
             {
                 isAnswerSide: true,
+                reviewTapToken: reviewTapToken,
                 lookupPopupEnabled: !!lookupPopupEnabled,
                 dictionaryScanLength: dictionaryScanLength ?? 16,
                 bodyClass: bodyclass,

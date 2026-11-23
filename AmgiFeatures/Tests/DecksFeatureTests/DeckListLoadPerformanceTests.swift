@@ -13,13 +13,7 @@ import Dependencies
 import XCTest
 @testable import DecksFeature
 
-/// Regression guard for the deck-list load — the action `AppSignpost` marks
-/// as `DeckListLoad`, and the most expensive thing on the launch path.
-///
-/// Measured on a real 1,258-card / 38-deck / 14,777-revlog collection
-/// (iPhone 17 Pro simulator, Release): `DeckListLoad` 192 ms, of which
-/// `DeckListActivity` — the 365-day revlog assembly — was 45 ms and phase
-/// one was 145 ms. A trace proves that today; this keeps it proven.
+/// Regression guard for the deck-list load marked as `DeckListLoad`.
 ///
 /// XCTest, not Swift Testing, deliberately: `measure(metrics:)` and the
 /// `XCTClockMetric` / `XCTMemoryMetric` types have no Swift Testing
@@ -27,9 +21,8 @@ import XCTest
 ///
 /// These measure *assembly*, not the engine: the clients are stubbed, so a
 /// regression here means the Swift-side mapping, state construction, or
-/// heatmap folding got slower — not that the Rust backend did. Record a
-/// baseline in Xcode (the diamond next to the test) for the numbers to be
-/// enforced rather than merely reported.
+/// sparkline assembly got slower. Record a baseline in Xcode (the diamond
+/// next to the test) to enforce the measurements.
 final class DeckListLoadPerformanceTests: XCTestCase {
 
     // MARK: - Fixtures
@@ -60,11 +53,11 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         }
     }
 
-    /// A full year of review history, which is the window `load()` fetches.
+    /// Two weeks of review history for the Library sparkline.
     private static func graphs() -> GraphsSnapshot {
         var snapshot = GraphsSnapshot()
         var counts: [Int: ReviewCountsAndTimes.Reviews] = [:]
-        for offset in -364...0 {
+        for offset in -13...0 {
             counts[offset] = .init(learn: 12, relearn: 3, young: 40, mature: 25, filtered: 0)
         }
         snapshot.reviews = .init(count: counts, time: counts)
@@ -98,7 +91,7 @@ final class DeckListLoadPerformanceTests: XCTestCase {
     // MARK: - Measurements
 
     /// Both phases of `DeckListLoad`: the tree fetch and row mapping, then
-    /// the 365-day activity fold.
+    /// the 14-day activity fold.
     func testDeckListLoadPerformance() {
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
             let loaded = expectation(description: "deck list loaded")
@@ -111,17 +104,6 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         }
     }
 
-    /// The pure fold on its own — no I/O, no actor hops, so a change here is
-    /// unambiguously the algorithm rather than scheduling noise.
-    func testHeatmapBuildPerformance() {
-        let reviews = Self.graphs().reviews.count
-        measure(metrics: [XCTClockMetric()]) {
-            for _ in 0..<200 {
-                _ = DeckListModel.buildHeatmap(reviews: reviews)
-            }
-        }
-    }
-
     // MARK: - Correctness
 
     /// The measurement above is worthless if the fixture silently stops
@@ -131,12 +113,12 @@ final class DeckListLoadPerformanceTests: XCTestCase {
     func testFixtureActuallyLoads() async {
         let model = Self.makeModel()
         await model.load()
-        guard case .loaded(let rows, let hero, let heatmap) = model.state else {
+        guard case .loaded(let rows, let hero) = model.state else {
             return XCTFail("expected .loaded, got \(model.state)")
         }
         XCTAssertEqual(rows.count, 7, "top-level rows")
         XCTAssertEqual(hero.deckCount, 7)
-        XCTAssertEqual(heatmap?.counts.count, 365, "a full year of activity")
+        XCTAssertEqual(hero.last14Days, Array(repeating: 80, count: 14))
     }
 }
 

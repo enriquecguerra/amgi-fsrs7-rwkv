@@ -37,10 +37,8 @@ struct ReviewSettingsView: View {
     @Shared(.appStorage(ReviewPreferences.Keys.playAudioInSilentMode))
     private var playAudioInSilentMode: Bool = false
 
-    /// Read by AnkiServices' `RwkvEnvironment.precisionKey`; the desktop's
-    /// profile setting of the same name.
-    @Shared(.appStorage("rwkvStatePrecision"))
-    private var rwkvStatePrecision: String = "int8"
+    @Shared(.appStorage(RwkvEnvironment.precisionKey))
+    private var rwkvStatePrecision: String = RwkvEnvironment.defaultPrecision
 
     @Dependency(\.rwkvClient) private var rwkv
     @Dependency(\.collectionStore) private var store
@@ -143,9 +141,9 @@ struct ReviewSettingsView: View {
                     tone: .info,
                     selection: Binding($rwkvStatePrecision)
                 ) {
-                    Text("f32 — full precision fallback").tag("f32")
-                    Text("int8 — recommended").tag("int8")
-                    Text("int4 — experimental, reduced accuracy").tag("int4")
+                    Text("int4 cards / int8 notes — Windows default").tag(RwkvEnvironment.defaultPrecision)
+                    Text("int8").tag("int8")
+                    Text("f32 — full precision").tag("f32")
                 }
                 SettingsSeparator()
                 SettingsButtonRow(
@@ -158,7 +156,7 @@ struct ReviewSettingsView: View {
                 }
                 .disabled(rescheduling)
             }
-            Text("Precision applies to card and note state in memory and on disk. Computation remains at full precision; the next RWKV use rebuilds state from review history. int4 saves more memory but can noticeably change predictions.")
+            Text("Storage precision controls how card and note state is kept in memory and on disk. Lower precision saves memory and can change predictions. Changing it rebuilds model state from review history.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)

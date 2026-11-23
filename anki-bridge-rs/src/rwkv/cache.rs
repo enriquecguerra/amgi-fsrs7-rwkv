@@ -16,7 +16,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
-use anki::rwkv::RwkvInference;
+use anki::rwkv::RwkvRuntime;
 use anki::rwkv::RwkvWarmUpSnapshot;
 use serde::Deserialize;
 use serde::Serialize;
@@ -63,7 +63,7 @@ fn read_header_from(reader: &mut impl Read) -> io::Result<Header> {
     serde_json::from_slice(&json).map_err(|e| invalid(&e.to_string()))
 }
 
-pub(super) fn write(dir: &Path, header: &Header, inference: &RwkvInference) -> io::Result<()> {
+pub(super) fn write(dir: &Path, header: &Header, inference: &RwkvRuntime) -> io::Result<()> {
     fs::create_dir_all(dir)?;
     let final_path = path(dir);
     let tmp_path = final_path.with_extension("tmp");
@@ -74,7 +74,7 @@ pub(super) fn write(dir: &Path, header: &Header, inference: &RwkvInference) -> i
         out.write_all(&(json.len() as u32).to_le_bytes())?;
         out.write_all(&json)?;
 
-        let snapshot = inference.warm_up_snapshot();
+        let snapshot = inference.warm_up_snapshot()?;
         for map in [
             &snapshot.card_states,
             &snapshot.note_states,
@@ -101,7 +101,7 @@ pub(super) fn write(dir: &Path, header: &Header, inference: &RwkvInference) -> i
 }
 
 /// Restores the state written by `write` into a freshly loaded runtime.
-pub(super) fn restore(dir: &Path, inference: &mut RwkvInference) -> io::Result<()> {
+pub(super) fn restore(dir: &Path, inference: &mut RwkvRuntime) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(1 << 20, File::open(path(dir))?);
     read_header_from(&mut reader)?;
     let mut maps: [Vec<(i64, Vec<u8>)>; 4] = Default::default();

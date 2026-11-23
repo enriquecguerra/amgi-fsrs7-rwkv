@@ -373,7 +373,7 @@ fn model_key(path: &Path) -> Result<String> {
             return Ok(digest.clone());
         }
     }
-    let digest = hex_sha256(&fs::read(path)?);
+    let digest = runtime_digest(path)?;
     *key = Some((path.to_path_buf(), len, modified, digest.clone()));
     Ok(digest)
 }
@@ -651,12 +651,7 @@ fn compute(backend: &Backend, context: &Context, job: &Job) -> Result<(), Stop> 
         return Err(Stop::Preempted);
     }
 
-    let mut runtime = RwkvInference::load_with_precision(
-        context.model_path.clone(),
-        TARGET_RETENTION,
-        MAX_INTERVAL_DAYS,
-        context.precision,
-    )?;
+    let mut runtime = load_runtime(&context.model_path, context.precision)?;
     let shape = Shape {
         identity: &identity,
         first_day,
@@ -787,7 +782,7 @@ fn compute(backend: &Backend, context: &Context, job: &Job) -> Result<(), Stop> 
 /// `_predict_rwkv_memorised_day`: each card's last review input queried at
 /// the end of `day`, in card id order.
 fn predict_day(
-    runtime: &mut RwkvInference,
+    runtime: &mut RwkvRuntime,
     active_inputs: &BTreeMap<i64, ReviewInput>,
     day: i64,
 ) -> Result<Vec<f32>> {
@@ -835,7 +830,7 @@ fn initial_build(
     review_ids: &[i64],
     cached_is_prefix: bool,
     history: &Identity,
-    runtime: &mut RwkvInference,
+    runtime: &mut RwkvRuntime,
 ) -> Result<Build> {
     let mut resume = job.state().checkpoint.clone();
     if resume.as_ref().is_some_and(|r| r.complete) {
@@ -979,7 +974,7 @@ fn restore_checkpoint(
     checkpoint: &HistoryResult,
     shape: &Shape<'_>,
     reviews: &[ReviewInput],
-    runtime: &mut RwkvInference,
+    runtime: &mut RwkvRuntime,
 ) -> Result<Option<Build>> {
     let Some(completed_day) = checkpoint.completed_through_day else {
         return Ok(None);

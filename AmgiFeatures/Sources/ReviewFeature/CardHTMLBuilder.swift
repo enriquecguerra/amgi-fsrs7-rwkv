@@ -77,7 +77,8 @@ extension CardWebView {
         replayMode: String,
         alignTop: Bool,
         bodyPaddingBottom: Int,
-        cardPaddingBottom: Int
+        cardPaddingBottom: Int,
+        reviewTapToken: String
     ) -> String {
         let htmlLit = jsStringLiteral(processedHTML)
         let cssLit = jsStringLiteral(cardCSS)
@@ -85,12 +86,13 @@ extension CardWebView {
         let lookupEnabled = lookupPopupEnabled ? "true" : "false"
         let alignTopStr = alignTop ? "true" : "false"
         let applyCSS = "amgiSetCardCSS(\(cssLit));"
+        let tapToken = jsStringLiteral(reviewTapToken)
 
         if isAnswerSide {
-            return applyCSS + "_showAnswer(\(htmlLit),\(jsStringLiteral(bodyClass)),\(autoplay),\(jsStringLiteral(replayMode)),\(alignTopStr),\(bodyPaddingBottom),\(cardPaddingBottom),\(lookupEnabled),\(dictionaryScanLength)" + ");"
+            return applyCSS + "_showAnswer(\(htmlLit),\(jsStringLiteral(bodyClass)),\(autoplay),\(jsStringLiteral(replayMode)),\(alignTopStr),\(bodyPaddingBottom),\(cardPaddingBottom),\(lookupEnabled),\(dictionaryScanLength),\(tapToken));"
         } else {
             let prefetchLit = jsStringLiteral(prefetchHTML ?? "")
-            return applyCSS + "_showQuestion(\(htmlLit),\(prefetchLit),\(jsStringLiteral(bodyClass)),\(autoplay),\(jsStringLiteral(replayMode)),\(alignTopStr),\(bodyPaddingBottom),\(cardPaddingBottom),\(lookupEnabled),\(dictionaryScanLength)" + ");"
+            return applyCSS + "_showQuestion(\(htmlLit),\(prefetchLit),\(jsStringLiteral(bodyClass)),\(autoplay),\(jsStringLiteral(replayMode)),\(alignTopStr),\(bodyPaddingBottom),\(cardPaddingBottom),\(lookupEnabled),\(dictionaryScanLength),\(tapToken));"
         }
     }
 

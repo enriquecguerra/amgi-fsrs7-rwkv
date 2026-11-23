@@ -22,7 +22,7 @@ import AmgiCardWeb
 /// — nested `Coordinator` class, lines ~1757-2053) and promoted to a top-level type.
 ///
 /// The coordinator is responsible for:
-///  - Receiving the 7 JS bridge messages (amgi* names)
+///  - Receiving JS bridge messages
 ///  - Calling back to the SwiftUI layer via stored closures
 ///  - AVSpeechSynthesizer integration for TTS
 ///  - Frame-load lifecycle so per-card evaluateJavaScript runs at the right moment
@@ -38,6 +38,8 @@ final class CardWebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMess
     var lastLookupHighlightGeneration: Int = 0
     var isPageLoaded = false
     var pendingUpdateScript: String?
+    var reviewTapToken = ""
+    var onReviewTap: ((CGFloat) -> Void)?
     var openLinksExternally: Bool = true
     weak var currentWebView: WKWebView?
 
@@ -72,6 +74,16 @@ final class CardWebViewCoordinator: NSObject, WKNavigationDelegate, WKScriptMess
     // MARK: - WKScriptMessageHandler
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "amgiReviewTap" {
+            guard message.frameInfo.isMainFrame,
+                  !reviewTapToken.isEmpty,
+                  let body = message.body as? [String: Any],
+                  body["token"] as? String == reviewTapToken,
+                  let fraction = body["fraction"] as? NSNumber else { return }
+            onReviewTap?(CGFloat(truncating: fraction))
+            return
+        }
+
         if message.name == "amgiShowAnswer" {
             onShowAnswerRequested?()
             return

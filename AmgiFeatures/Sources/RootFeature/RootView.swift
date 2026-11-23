@@ -40,9 +40,6 @@ public struct RootView: View {
     @State private var showImport = false
     @State private var refreshID = UUID()
 
-    @Shared(.appStorage(ReaderPreferences.Keys.showTab))
-    private var showReaderTab: Bool = true
-
     public var body: some View {
         routed
             // Rebuild the entire view tree when the active profile changes —
@@ -97,7 +94,6 @@ public struct RootView: View {
     private var main: some View {
         MainTabView(
             refreshID: refreshID,
-            showReaderTab: showReaderTab,
             onImport: { showImport = true },
             onSelectStudyDeck: { pendingReviewDeckId = $0 }
         )

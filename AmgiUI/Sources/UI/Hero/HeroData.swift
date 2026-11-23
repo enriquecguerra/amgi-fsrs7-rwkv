@@ -12,20 +12,18 @@ import Foundation
 public struct HeroData: Equatable, Hashable, Sendable {
     public let totalDue: Int
     public let deckCount: Int
-    public let streak: Int
-    public let last14Days: [Int]    // oldest → newest, length 14
+    /// Oldest to newest. Nil while the activity history is loading.
+    public let last14Days: [Int]?
 
-    public init(totalDue: Int, deckCount: Int, streak: Int, last14Days: [Int]) {
+    public init(totalDue: Int, deckCount: Int, last14Days: [Int]?) {
         self.totalDue = totalDue
         self.deckCount = deckCount
-        self.streak = streak
         self.last14Days = last14Days
     }
 
     public static let zero = HeroData(
         totalDue: 0,
         deckCount: 0,
-        streak: 0,
         last14Days: Array(repeating: 0, count: 14)
     )
 }
