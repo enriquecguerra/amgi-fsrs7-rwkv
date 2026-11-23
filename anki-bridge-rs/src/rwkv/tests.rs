@@ -1464,6 +1464,36 @@ fn edit_config(fx: &Fixture, edit: impl FnOnce(&mut anki_proto::deck_config::dec
 }
 
 #[test]
+fn synced_precompute_switch_controls_refresh_with_descending_reviews() {
+    use anki_proto::deck_config::deck_config::config::{NewCardGatherPriority, ReviewCardOrder};
+
+    for precompute in [false, true] {
+        let Some(fx) = fixture("precompute-refresh", 12) else {
+            return;
+        };
+        edit_config(&fx, |config| {
+            config.rwkv_review_precompute_next_card = precompute;
+            config.rwkv_review_refresh_interval = 1;
+            config.review_order = ReviewCardOrder::RetrievabilityDescending.into();
+            config.new_card_gather_priority = NewCardGatherPriority::Deck.into();
+        });
+        let mut engine = Engine::default();
+        prepare(&mut engine, &fx, None);
+        engine
+            .score_deck_request(
+                &fx.backend,
+                ScoreDeckRequest {
+                    deck_id: 1,
+                    new_session: true,
+                },
+            )
+            .unwrap();
+        assert!(answer_next(&mut engine, &fx, 3).is_some());
+        assert_eq!(engine.deferred_refresh, precompute.then_some(1));
+    }
+}
+
+#[test]
 fn candidate_refresh_reuses_scores_only_while_they_are_current() {
     let Some(fx) = fixture("candidates", 8) else {
         return;

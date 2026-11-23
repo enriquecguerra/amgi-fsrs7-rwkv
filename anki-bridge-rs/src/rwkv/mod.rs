@@ -1066,7 +1066,7 @@ impl Engine {
         current_card: Option<i64>,
     ) -> Result<Option<Vec<i64>>> {
         let inner = config_inner(config);
-        if !inner.rwkv_review_candidate_refresh_enabled {
+        if !inner.rwkv_review_precompute_next_card || !inner.rwkv_review_candidate_refresh_enabled {
             return Ok(None);
         }
         let Some(installed) = self
@@ -1598,10 +1598,12 @@ impl Engine {
             .as_ref()
             .map_or(0, |c| config_inner(c).rwkv_review_min_intervening_reviews);
 
-        if refresh_due || last_card || last_review {
-            let before_next_card = last_card
-                || last_review
-                || (refresh_due && new_gather_uses_retrievability(&config));
+        // With precompute off, rank the next card using the answer just committed.
+        // The new-card gather priority only determines which cards get scores.
+        let before_next_card = !config_inner(&config).rwkv_review_precompute_next_card
+            || last_card
+            || last_review;
+        if before_next_card || refresh_due {
             if before_next_card {
                 self.score_deck(backend, deck_id, Some(card.id))?;
             } else {

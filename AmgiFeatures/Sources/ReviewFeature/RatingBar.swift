@@ -23,26 +23,16 @@ struct RatingBar: View {
 
     private struct Choice {
         let rating: Rating
-        let label: String
         let key: Character
     }
 
     private var choices: [Choice] {
         [
-            Choice(rating: .again, label: "Again", key: "1"),
-            Choice(rating: .hard, label: "Hard", key: "2"),
-            Choice(rating: .good, label: "Good", key: "3"),
-            Choice(rating: .easy, label: "Easy", key: "4"),
+            Choice(rating: .again, key: "1"),
+            Choice(rating: .hard, key: "2"),
+            Choice(rating: .good, key: "3"),
+            Choice(rating: .easy, key: "4"),
         ]
-    }
-
-    private func color(for rating: Rating) -> Color {
-        switch rating {
-        case .again: palette.danger
-        case .hard: palette.warning
-        case .good: palette.positive
-        case .easy: palette.info
-        }
     }
 
     var body: some View {
@@ -72,7 +62,7 @@ struct RatingBar: View {
     }
 
     private func ratingCard(_ choice: Choice) -> some View {
-        ratingCard(choice.rating, label: choice.label, color: color(for: choice.rating))
+        ratingCard(choice.rating, label: choice.rating.reviewLabel, color: choice.rating.reviewColor(in: palette))
             .keyboardShortcut(
                 shortcutsEnabled
                     ? KeyboardShortcut(KeyEquivalent(choice.key), modifiers: [])
@@ -112,6 +102,26 @@ struct RatingBar: View {
         .buttonStyle(.pressScale)
         .disabled(isDisabled)
         .accessibilityLabel("\(label)\(showIntervals ? ", next in \(intervals[rating] ?? "")" : "")")
+    }
+}
+
+extension Rating {
+    var reviewLabel: String {
+        switch self {
+        case .again: "Again"
+        case .hard: "Hard"
+        case .good: "Good"
+        case .easy: "Easy"
+        }
+    }
+
+    func reviewColor(in palette: Palette) -> Color {
+        switch self {
+        case .again: palette.danger
+        case .hard: palette.warning
+        case .good: palette.positive
+        case .easy: palette.info
+        }
     }
 }
 

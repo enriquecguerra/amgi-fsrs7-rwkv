@@ -44,6 +44,8 @@ struct ReviewContent: View {
     @State private var cardActions = CardContextMenuModel()
     @State private var confirmDeleteNote = false
     @State private var lookupHighlight = LookupHighlight()
+    @Shared(.appStorage(ReviewPreferences.Keys.showCorrectnessSymbols))
+    private var showFeedbackTicks = true
 
     private var keyboardActive: Bool {
         destination == nil && !confirmDeleteNote
@@ -78,6 +80,11 @@ struct ReviewContent: View {
                 }
             }
             .background(palette.background)
+            .overlay(alignment: .topTrailing) {
+                if showFeedbackTicks {
+                    ReviewGradeFeedback(session: session)
+                }
+            }
             .reviewHaptics(session: session)
             .navigationBarTitleDisplayMode(.inline)
             #if canImport(UIKit)
@@ -219,6 +226,65 @@ private struct CardChromeToolbar: ViewModifier {
                 enabled && session.cardChromeIsDark ? .dark : .light,
                 for: .navigationBar
             )
+    }
+}
+
+private struct ReviewGradeFeedback: View {
+    let session: ReviewSession
+
+    @Environment(\.palette) private var palette
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
+    @State private var rating: Rating?
+
+    var body: some View {
+        ZStack {
+            if let rating {
+                HStack(spacing: AmgiSpacing.xs) {
+                    Image(systemName: rating == .again ? "xmark" : "checkmark")
+                        .amgiFont(.bodyEmphasis)
+                        .foregroundStyle(rating.reviewColor(in: palette))
+
+                    if differentiateWithoutColor {
+                        Text(rating.reviewLabel)
+                            .amgiFont(.caption)
+                            .foregroundStyle(palette.textPrimary)
+                    }
+                }
+                .padding(AmgiSpacing.sm)
+                .background(palette.surfaceElevated, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(palette.separator, lineWidth: 1)
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(.top, AmgiSpacing.sm)
+        .padding(.trailing, AmgiSpacing.md)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .task(id: session.answerTapCount) {
+            guard session.answerTapCount > 0, !Task.isCancelled else { return }
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                rating = session.tappedRating
+            }
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            withAnimation(AmgiMotion.quick) {
+                rating = nil
+            }
+        }
+        .onChange(of: session.answerError) { _, error in
+            if error != nil { rating = nil }
+        }
+        .onChange(of: session.undoneCount) { _, _ in
+            rating = nil
+        }
     }
 }
 

@@ -34,6 +34,9 @@ struct ReviewSettingsView: View {
     @Shared(.appStorage(ReviewPreferences.Keys.showNextReviewTime))
     private var showNextReviewTime: Bool = true
 
+    @Shared(.appStorage(ReviewPreferences.Keys.showCorrectnessSymbols))
+    private var showFeedbackTicks = true
+
     @Shared(.appStorage(ReviewPreferences.Keys.playAudioInSilentMode))
     private var playAudioInSilentMode: Bool = false
 
@@ -101,6 +104,13 @@ struct ReviewSettingsView: View {
         Group {
             SettingsSectionHeader(title: "Answer Buttons")
             SettingsGroup {
+                SettingsToggleRow(
+                    title: "Feedback ticks",
+                    systemImage: "checkmark.circle",
+                    tone: .mature,
+                    isOn: Binding($showFeedbackTicks)
+                )
+                SettingsSeparator()
                 SettingsToggleRow(
                     title: "Show remaining counts",
                     systemImage: "number",
