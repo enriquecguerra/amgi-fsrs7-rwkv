@@ -7,10 +7,10 @@ on:
         description: macOS runner with Xcode 26.3
         type: choice
         default: macos-26
-        options: [macos-26, macos-15]
+        options: [macos-26, macos-15, macos-26-intel]
 
 concurrency:
-  group: build-ipa-${{ github.ref }}
+  group: build-ipa-${{ github.ref }}-${{ inputs.runner }}
   cancel-in-progress: true
 
 env:
@@ -64,7 +64,7 @@ jobs:
         with:
           # Matches anki-upstream's rust-toolchain.toml (JSchoreels/anki fork).
           toolchain: "1.97.1"
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
       # ── 4.5. Install nightly + rust-src (watchOS build-std) ───────
       # build-xcframework.sh builds the tier-3 watchOS sim slice with
@@ -72,6 +72,7 @@ jobs:
       # therefore needs rust-src. Plain `rustup toolchain install` (not the
       # dtolnay action) so stable 1.95 above stays the default toolchain.
       - name: Install Rust nightly with rust-src
+        if: runner.arch == 'ARM64'
         run: rustup toolchain install nightly --profile minimal --component rust-src
 
       # ── 5. Cache Rust build artifacts ─────────────────────────────
@@ -85,9 +86,9 @@ jobs:
             amgi/anki-upstream/out
           # Toolchain version is part of the key so a Rust upgrade (1.95 → ...)
           # forces a clean rebuild rather than reusing artifacts from the prior compiler.
-          key: ${{ runner.os }}-rust-1.97.1-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-rust-1.97.1-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-rust-1.97.1-
+            ${{ runner.os }}-${{ runner.arch }}-rust-1.97.1-
 
       # ── 6. Install Homebrew dependencies ──────────────────────────
       - name: Install Homebrew dependencies
@@ -96,6 +97,8 @@ jobs:
 
       # ── 7. Build Rust XCFramework ─────────────────────────────────
       - name: Build Rust XCFramework
+        env:
+          DEVICE_ONLY: ${{ runner.arch == 'X64' && '1' || '0' }}
         run: |
           chmod +x ./scripts/build-xcframework.sh
           ./scripts/build-xcframework.sh
@@ -129,6 +132,7 @@ jobs:
 
       # ── 9.2. Simulator smoke check (catch UI/platform compile issues early) ──
       - name: Build Debug Simulator (Compatibility Smoke Check)
+        if: runner.arch == 'ARM64'
         run: |
           set -o pipefail
           DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData"

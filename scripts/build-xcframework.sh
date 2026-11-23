@@ -44,6 +44,7 @@ export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-install_name,@rpath/AnkiRustLi
 # source with -Z build-std on nightly. Requires: rustup toolchain install nightly
 # && rustup component add rust-src --toolchain nightly.
 NIGHTLY="${NIGHTLY_TOOLCHAIN:-nightly}"
+DEVICE_ONLY="${DEVICE_ONLY:-0}"
 
 echo "==> Using protoc: $PROTOC"
 echo "==> Deployment target: iOS $IPHONEOS_DEPLOYMENT_TARGET / watchOS $WATCHOS_DEPLOYMENT_TARGET"
@@ -53,20 +54,22 @@ cargo build \
     --target aarch64-apple-ios \
     --release
 
-echo "==> Building for iOS simulator (aarch64-apple-ios-sim)..."
-cargo build \
-    --manifest-path "$BRIDGE_DIR/Cargo.toml" \
-    --target aarch64-apple-ios-sim \
-    --release
+if [[ "$DEVICE_ONLY" != 1 ]]; then
+    echo "==> Building for iOS simulator (aarch64-apple-ios-sim)..."
+    cargo build \
+        --manifest-path "$BRIDGE_DIR/Cargo.toml" \
+        --target aarch64-apple-ios-sim \
+        --release
 
-echo "==> Building for watchOS simulator (aarch64-apple-watchos-sim, build-std)..."
-# ponytail: sim slice only. The watchOS *device* target is arm64_32-apple-watchos
-# (ILP32); add it here the same way once a physical-watch build is actually needed.
-cargo "+$NIGHTLY" build \
-    -Z build-std=std,panic_abort \
-    --manifest-path "$BRIDGE_DIR/Cargo.toml" \
-    --target aarch64-apple-watchos-sim \
-    --release
+    echo "==> Building for watchOS simulator (aarch64-apple-watchos-sim, build-std)..."
+    # ponytail: sim slice only. The watchOS *device* target is arm64_32-apple-watchos
+    # (ILP32); add it here the same way once a physical-watch build is actually needed.
+    cargo "+$NIGHTLY" build \
+        -Z build-std=std,panic_abort \
+        --manifest-path "$BRIDGE_DIR/Cargo.toml" \
+        --target aarch64-apple-watchos-sim \
+        --release
+fi
 
 # Wrap one cdylib into AnkiRustLib.framework. $1 = rust triple, $2 = slice name,
 # $3 = CFBundleSupportedPlatforms entry, $4 = MinimumOSVersion.
@@ -115,16 +118,17 @@ PLIST
 echo "==> Staging frameworks..."
 rm -rf "$STAGE_DIR"
 make_framework aarch64-apple-ios            ios-device  iPhoneOS        "$IPHONEOS_DEPLOYMENT_TARGET"
-make_framework aarch64-apple-ios-sim        ios-sim     iPhoneSimulator "$IPHONEOS_DEPLOYMENT_TARGET"
-make_framework aarch64-apple-watchos-sim    watchos-sim WatchSimulator  "$WATCHOS_DEPLOYMENT_TARGET"
+FRAMEWORKS=(-framework "$STAGE_DIR/ios-device/AnkiRustLib.framework")
+if [[ "$DEVICE_ONLY" != 1 ]]; then
+    make_framework aarch64-apple-ios-sim     ios-sim     iPhoneSimulator "$IPHONEOS_DEPLOYMENT_TARGET"
+    make_framework aarch64-apple-watchos-sim watchos-sim WatchSimulator   "$WATCHOS_DEPLOYMENT_TARGET"
+    FRAMEWORKS+=(-framework "$STAGE_DIR/ios-sim/AnkiRustLib.framework")
+    FRAMEWORKS+=(-framework "$STAGE_DIR/watchos-sim/AnkiRustLib.framework")
+fi
 
 echo "==> Packaging XCFramework..."
 rm -rf "$OUTPUT_DIR"
-xcodebuild -create-xcframework \
-    -framework "$STAGE_DIR/ios-device/AnkiRustLib.framework" \
-    -framework "$STAGE_DIR/ios-sim/AnkiRustLib.framework" \
-    -framework "$STAGE_DIR/watchos-sim/AnkiRustLib.framework" \
-    -output "$OUTPUT_DIR"
+xcodebuild -create-xcframework "${FRAMEWORKS[@]}" -output "$OUTPUT_DIR"
 
 echo "==> Restoring cargo binaries over the packaged ones (LINKEDIT alignment)..."
 restore_binary() {
@@ -147,8 +151,10 @@ restore_binary() {
 }
 
 restore_binary aarch64-apple-ios         ios-arm64
-restore_binary aarch64-apple-ios-sim     ios-arm64-simulator
-restore_binary aarch64-apple-watchos-sim watchos-arm64-simulator
+if [[ "$DEVICE_ONLY" != 1 ]]; then
+    restore_binary aarch64-apple-ios-sim     ios-arm64-simulator
+    restore_binary aarch64-apple-watchos-sim watchos-arm64-simulator
+fi
 
 echo "==> Done! XCFramework at: $OUTPUT_DIR"
 echo "==> Contents:"
