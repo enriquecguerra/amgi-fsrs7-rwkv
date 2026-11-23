@@ -102,13 +102,31 @@ public final class AccountStore {
         }
         let id = Self.slug(from: trimmed)
         guard !id.isEmpty else { throw AccountStoreError.emptyName }
-        if accounts.contains(where: { $0.id == id }) {
+        if accounts.contains(where: {
+            $0.id == id || $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+        }) {
             throw AccountStoreError.duplicateName
         }
         let account = AmgiAccount(id: id, displayName: trimmed, createdAt: .now)
         accounts.append(account)
         persistAccounts()
         return account
+    }
+
+    /// Renames the label while retaining the collection path and sync identity.
+    public func rename(id: String, to name: String) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw AccountStoreError.emptyName }
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else {
+            throw AccountStoreError.profileNotFound
+        }
+        guard !accounts.contains(where: {
+            $0.id != id && $0.displayName.caseInsensitiveCompare(trimmed) == .orderedSame
+        }) else {
+            throw AccountStoreError.duplicateName
+        }
+        accounts[index].displayName = trimmed
+        persistAccounts()
     }
 
     /// Removes a profile and (if requested) its on-disk collection.
@@ -199,6 +217,7 @@ public final class AccountStore {
 enum AccountStoreError: LocalizedError {
     case emptyName
     case duplicateName
+    case profileNotFound
     case cannotDeleteLast
     case cannotDeleteActive
 
@@ -206,6 +225,7 @@ enum AccountStoreError: LocalizedError {
         switch self {
         case .emptyName: return "Profile name can't be empty."
         case .duplicateName: return "A profile with that name already exists."
+        case .profileNotFound: return "This profile no longer exists."
         case .cannotDeleteLast: return "You need at least one profile."
         case .cannotDeleteActive: return "Switch to another profile before deleting this one."
         }

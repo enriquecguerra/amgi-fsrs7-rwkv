@@ -33,14 +33,13 @@ struct AccountsSettingsView: View {
     /// it — and a delete error can no longer be raised over a live sheet.
     @CasePathable
     enum Destination {
-        case add(NewProfile)
+        case editName(ProfileNameDraft)
         case confirmDelete(AmgiAccount)
         case deleteFailed(String)
     }
 
-    /// In-flight new profile: the name the sheet's text field edits, plus
-    /// whatever `AccountStore.add` rejected it with.
-    struct NewProfile {
+    struct ProfileNameDraft {
+        var existingID: String?
         var name = ""
         var error: String?
     }
@@ -62,8 +61,8 @@ struct AccountsSettingsView: View {
         .background(palette.background)
         .navigationTitle("Profiles")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: Binding($destination.add)) {
-            addProfileSheet
+        .sheet(isPresented: Binding($destination.editName)) {
+            profileNameSheet
         }
         .confirmationDialog(
             "Delete \(pendingDelete?.displayName ?? "")?",
@@ -101,22 +100,19 @@ struct AccountsSettingsView: View {
         return nil
     }
 
-    private var pendingAdd: NewProfile? {
-        if case .add(let draft) = destination { return draft }
+    private var nameDraft: ProfileNameDraft? {
+        if case .editName(let draft) = destination { return draft }
         return nil
     }
 
-    private var addError: String? { pendingAdd?.error }
-
-    /// The add sheet's text field edits the draft in place inside
-    /// `destination`, so there's no second copy of the name to keep in sync.
-    private var newName: Binding<String> {
+    private var profileName: Binding<String> {
         Binding(
-            get: { pendingAdd?.name ?? "" },
+            get: { nameDraft?.name ?? "" },
             set: { newValue in
-                guard var draft = pendingAdd else { return }
+                guard var draft = nameDraft else { return }
                 draft.name = newValue
-                destination = .add(draft)
+                draft.error = nil
+                destination = .editName(draft)
             }
         )
     }
@@ -144,7 +140,7 @@ struct AccountsSettingsView: View {
     private var addSection: some View {
         Section {
             Button {
-                destination = .add(NewProfile())
+                destination = .editName(ProfileNameDraft())
             } label: {
                 HStack(spacing: AmgiSpacing.md) {
                     SettingsIconTile(systemImage: "plus", tone: .accent)
@@ -161,14 +157,15 @@ struct AccountsSettingsView: View {
         }
     }
 
-    private var addProfileSheet: some View {
-        NavigationStack {
+    private var profileNameSheet: some View {
+        let isRename = nameDraft?.existingID != nil
+        return NavigationStack {
             SettingsPage {
                 SettingsSectionHeader(title: "Name")
                 SettingsGroup {
                     TextField(
                         "Profile name",
-                        text: newName,
+                        text: profileName,
                         prompt: Text("e.g. Korean").foregroundStyle(palette.textTertiary)
                     )
                         .amgiFont(.body)
@@ -180,20 +177,20 @@ struct AccountsSettingsView: View {
                         .padding(.vertical, AmgiSpacing.md)
                         .frame(minHeight: 44)
                 }
-                if let addError {
-                    SettingsFootnote(addError)
+                if let error = nameDraft?.error {
+                    SettingsFootnote(error)
                         .foregroundStyle(palette.danger)
                 }
             }
-            .navigationTitle("New profile")
+            .navigationTitle(isRename ? "Rename profile" : "New profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { destination = nil }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { attemptAdd() }
-                        .disabled(newName.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(isRename ? "Save" : "Add") { saveProfileName() }
+                        .disabled(profileName.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
@@ -226,6 +223,14 @@ private extension AccountsSettingsView {
                 }
             }
         }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            Button {
+                destination = .editName(ProfileNameDraft(existingID: account.id, name: account.displayName))
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            .tint(palette.accent)
+        }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 destination = .confirmDelete(account)
@@ -236,14 +241,18 @@ private extension AccountsSettingsView {
         }
     }
 
-    func attemptAdd() {
-        guard var draft = pendingAdd else { return }
+    func saveProfileName() {
+        guard var draft = nameDraft else { return }
         do {
-            _ = try store.add(displayName: draft.name)
+            if let id = draft.existingID {
+                try store.rename(id: id, to: draft.name)
+            } else {
+                _ = try store.add(displayName: draft.name)
+            }
             destination = nil
         } catch {
             draft.error = error.localizedDescription
-            destination = .add(draft)
+            destination = .editName(draft)
         }
     }
 
