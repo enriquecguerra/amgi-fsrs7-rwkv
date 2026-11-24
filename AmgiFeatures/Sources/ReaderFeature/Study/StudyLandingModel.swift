@@ -32,29 +32,13 @@ final class StudyLandingModel {
 
     func load() async {
         do {
-            // 1. Deck tree → flatten → filter due > 0 → sort desc
             let tree = try await store.tree()
             guard !tree.isEmpty else {
                 contentState = .empty
                 return
             }
 
-            let allDecks: [DeckInfo] = tree.flattened()
-            let dueDecks = allDecks
-                .filter { $0.counts.total > 0 }
-                .sorted { $0.counts.total > $1.counts.total }
-
-            let deckRows = dueDecks.map { deck in
-                StudyDeckRowData(
-                    id: deck.id.rawValue,
-                    name: deck.name,
-                    totalDue: deck.counts.total,
-                    newCount: deck.counts.newCount,
-                    learnCount: deck.counts.learnCount,
-                    reviewCount: deck.counts.reviewCount,
-                    isFiltered: deck.isFiltered
-                )
-            }
+            let deckRows = Self.dueBranches(tree)
 
             // Parent counts already include their subdecks and apply the
             // parent's limits. Use top-level counts for the Today summary.
@@ -66,7 +50,7 @@ final class StudyLandingModel {
             }
             let deckCount = dueTopLevelDecks.count
 
-            // 3. Build subtitle label from current weekday + deck count
+            // Build the subtitle from the weekday and the top-level deck count.
             let weekday = Date().formatted(.dateTime.weekday(.wide))
             let subtitleLabel: String
             if deckCount == 0 {
@@ -80,12 +64,10 @@ final class StudyLandingModel {
                 newCount: counts.newCount,
                 learnCount: counts.learnCount,
                 reviewCount: counts.reviewCount,
-                todayLabel: "Today",
                 subtitleLabel: subtitleLabel,
                 deckCount: deckCount
             )
 
-            // 4. Books → sort by lastRead desc → take 8 → map to DTO
             let readingRecs = await loadReadingRecs()
 
             contentState = .loaded(summary: summary, decks: deckRows, readingRecs: readingRecs)
@@ -93,6 +75,24 @@ final class StudyLandingModel {
             Log.reader.error("Error loading: \(error)")
             contentState = .empty
         }
+    }
+
+    private static func dueBranches(_ decks: [DeckTreeNode]) -> [StudyDeckRowData] {
+        decks.compactMap { deck in
+            let children = dueBranches(deck.children)
+            guard deck.counts.total > 0 || !children.isEmpty else { return nil }
+            return StudyDeckRowData(
+                id: deck.id.rawValue,
+                name: deck.name,
+                totalDue: deck.counts.total,
+                newCount: deck.counts.newCount,
+                learnCount: deck.counts.learnCount,
+                reviewCount: deck.counts.reviewCount,
+                isFiltered: deck.isFiltered,
+                children: children
+            )
+        }
+        .sorted { $0.totalDue > $1.totalDue }
     }
 
     func selectBook(_ bookID: String) {

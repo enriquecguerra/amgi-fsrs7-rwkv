@@ -119,7 +119,7 @@ struct AccountsSettingsView: View {
 
     private var toolbarSection: some View {
         Section {
-            Toggle("Show in Today toolbar", isOn: Binding($showProfileInToolbar))
+            Toggle("Show in tab toolbars", isOn: Binding($showProfileInToolbar))
                 .listRowBackground(palette.surfaceElevated)
         } footer: {
             Text("The profile switcher is hidden automatically while you have only one profile. Profiles are always available here.")

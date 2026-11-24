@@ -3,7 +3,7 @@ import BrowseFeature
 import Sharing
 package import SwiftUI
 
-package struct TodayToolbar: ViewModifier {
+package struct CollectionToolbar: ViewModifier {
     private let onSwitchProfile: (AmgiAccount) async -> Void
     private let onSync: () -> Void
     private let onImport: () -> Void

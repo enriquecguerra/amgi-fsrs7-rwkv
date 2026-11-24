@@ -34,27 +34,22 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selection) {
             Tab("Today", systemImage: "graduationcap", value: MainTab.today) {
-                NavigationStack {
+                tabPage {
                     StudyLandingView(onSelectDeck: onSelectStudyDeck)
-                        .modifier(TodayToolbar(
-                            onSwitchProfile: { await switchProfile(to: $0) },
-                            onSync: { startSync() },
-                            onImport: onImport
-                        ))
                 }
             }
             Tab("Library", systemImage: "rectangle.stack", value: MainTab.library) {
-                NavigationStack {
+                tabPage {
                     DeckListView()
                 }
             }
             Tab("Stats", systemImage: "chart.bar", value: MainTab.stats) {
-                NavigationStack {
+                tabPage {
                     StatsDashboardView(refreshID: refreshID)
                 }
             }
             Tab("Settings", systemImage: "gearshape", value: MainTab.settings) {
-                NavigationStack {
+                tabPage {
                     SettingsView(onSwitchProfile: { await switchProfile(to: $0) })
                 }
             }
@@ -67,4 +62,15 @@ struct MainTabView: View {
         }
     }
 
+    private func tabPage<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        NavigationStack {
+            content()
+                .modifier(CollectionToolbar(
+                    onSwitchProfile: { await switchProfile(to: $0) },
+                    onSync: { startSync() },
+                    onImport: onImport
+                ))
+                .navigationBarTitleDisplayMode(.large)
+        }
+    }
 }

@@ -29,6 +29,7 @@ public struct StudyLandingContent: View {
     let onRefresh: () async -> Void
 
     @Environment(\.palette) private var palette
+    @State private var expandedDeckIDs: Set<Int64> = []
 
     public init(
         state: State,
@@ -81,7 +82,11 @@ public struct StudyLandingContent: View {
     ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                inlineHeader(summary: summary)
+                Text(summary.subtitleLabel)
+                    .amgiFont(.caption)
+                    .foregroundStyle(palette.textSecondary)
+                    .padding(.top, AmgiSpacing.xs)
+                    .padding(.bottom, AmgiSpacing.lg)
                 ringHero(summary: summary)
                 beginButton(totalDue: summary.totalDue)
                     .padding(.top, 20)
@@ -92,22 +97,6 @@ public struct StudyLandingContent: View {
             .padding(.bottom, 24)
         }
         .refreshable { await onRefresh() }
-    }
-
-    // MARK: - Inline header
-
-    private func inlineHeader(summary: StudySummaryData) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(summary.todayLabel)
-                .amgiFont(.displayHero)
-                .foregroundStyle(palette.textPrimary)
-            Text(summary.subtitleLabel)
-                .amgiFont(.caption)
-                .foregroundStyle(palette.textSecondary)
-        }
-        .padding(.top, 20)
-        .padding(.bottom, 24)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Ring (scrolls with page)
@@ -159,7 +148,8 @@ public struct StudyLandingContent: View {
 
     @ViewBuilder
     private func upNextSection(decks: [StudyDeckRowData]) -> some View {
-        if !decks.isEmpty {
+        let rows = visibleRows(in: decks)
+        if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 sectionHeader("Up Next")
                     .padding(.bottom, 4)
@@ -169,12 +159,11 @@ public struct StudyLandingContent: View {
                     contentInsets: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
                 ) {
                     VStack(spacing: 0) {
-                        ForEach(decks) { deck in
-                            StudyDeckRow(data: deck) { onSelectDeck(deck.id) }
-                                .padding(.horizontal, 12)
-                            if deck.id != decks.last?.id {
+                        ForEach(rows) { row in
+                            deckRow(row)
+                            if row.id != rows.last?.id {
                                 Divider()
-                                    .padding(.leading, 64)
+                                    .padding(.leading, AmgiSpacing.lg)
                             }
                         }
                     }
@@ -182,6 +171,51 @@ public struct StudyLandingContent: View {
             }
             .padding(.top, 20)
         }
+    }
+
+    private struct VisibleDeck: Identifiable {
+        let deck: StudyDeckRowData
+        let depth: Int
+        var id: Int64 { deck.id }
+    }
+
+    private func visibleRows(in decks: [StudyDeckRowData], depth: Int = 0) -> [VisibleDeck] {
+        decks.flatMap { deck in
+            let row = VisibleDeck(deck: deck, depth: depth)
+            guard expandedDeckIDs.contains(deck.id) else { return [row] }
+            return [row] + visibleRows(in: deck.children, depth: depth + 1)
+        }
+    }
+
+    private func deckRow(_ row: VisibleDeck) -> some View {
+        let deck = row.deck
+        let expanded = expandedDeckIDs.contains(deck.id)
+        return HStack(spacing: 0) {
+            if deck.children.isEmpty {
+                Color.clear.frame(width: 44, height: 1)
+                    .accessibilityHidden(true)
+            } else {
+                Button {
+                    if expanded {
+                        expandedDeckIDs.remove(deck.id)
+                    } else {
+                        expandedDeckIDs.insert(deck.id)
+                    }
+                } label: {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.forward")
+                        .amgiFont(.caption)
+                        .foregroundStyle(palette.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(expanded ? "Collapse \(deck.name)" : "Expand \(deck.name)")
+            }
+            StudyDeckRow(data: deck) { onSelectDeck(deck.id) }
+                .disabled(deck.totalDue == 0)
+        }
+        .padding(.leading, CGFloat(min(row.depth, 4)) * AmgiSpacing.sm)
+        .padding(.trailing, AmgiSpacing.md)
     }
 
     // MARK: - Reading recommendations
@@ -221,7 +255,6 @@ private let busySummary = StudySummaryData(
     newCount: 25,
     learnCount: 17,
     reviewCount: 13,
-    todayLabel: "Today",
     subtitleLabel: "Wednesday · 3 decks due",
     deckCount: 3
 )
@@ -263,7 +296,7 @@ private let sampleRecs: [StudyReadingRecData] = [
             state: .loaded(
                 summary: StudySummaryData(
                     totalDue: 0, newCount: 0, learnCount: 0, reviewCount: 0,
-                    todayLabel: "Today", subtitleLabel: "Wednesday", deckCount: 0
+                    subtitleLabel: "Wednesday", deckCount: 0
                 ),
                 decks: [],
                 readingRecs: sampleRecs

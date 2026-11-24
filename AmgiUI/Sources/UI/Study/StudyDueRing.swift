@@ -85,7 +85,6 @@ public struct StudyDueRing: View {
         newCount: 40,
         learnCount: 72,
         reviewCount: 75,
-        todayLabel: "Today",
         subtitleLabel: "Wednesday · 4 decks due",
         deckCount: 4
     ))
@@ -99,7 +98,6 @@ public struct StudyDueRing: View {
         newCount: 0,
         learnCount: 0,
         reviewCount: 0,
-        todayLabel: "Today",
         subtitleLabel: "Wednesday",
         deckCount: 0
     ))
@@ -113,7 +111,6 @@ public struct StudyDueRing: View {
         newCount: 10,
         learnCount: 8,
         reviewCount: 24,
-        todayLabel: "Today",
         subtitleLabel: "Thursday · 3 decks due",
         deckCount: 3
     ))

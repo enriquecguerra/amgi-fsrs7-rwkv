@@ -15,8 +15,6 @@ public struct StudySummaryData: Equatable, Sendable {
     public let newCount: Int
     public let learnCount: Int
     public let reviewCount: Int
-    /// e.g. "Today"
-    public let todayLabel: String
     /// e.g. "Wednesday · 4 decks due"
     public let subtitleLabel: String
     /// Number of decks with cards due — used by ring's "across N decks" subline.
@@ -27,7 +25,6 @@ public struct StudySummaryData: Equatable, Sendable {
         newCount: Int,
         learnCount: Int,
         reviewCount: Int,
-        todayLabel: String,
         subtitleLabel: String,
         deckCount: Int
     ) {
@@ -35,7 +32,6 @@ public struct StudySummaryData: Equatable, Sendable {
         self.newCount = newCount
         self.learnCount = learnCount
         self.reviewCount = reviewCount
-        self.todayLabel = todayLabel
         self.subtitleLabel = subtitleLabel
         self.deckCount = deckCount
     }
@@ -50,6 +46,7 @@ public struct StudyDeckRowData: Identifiable, Equatable, Sendable {
     public let learnCount: Int
     public let reviewCount: Int
     public let isFiltered: Bool
+    public let children: [StudyDeckRowData]
 
     public init(
         id: Int64,
@@ -58,7 +55,8 @@ public struct StudyDeckRowData: Identifiable, Equatable, Sendable {
         newCount: Int,
         learnCount: Int,
         reviewCount: Int,
-        isFiltered: Bool
+        isFiltered: Bool,
+        children: [StudyDeckRowData] = []
     ) {
         self.id = id
         self.name = name
@@ -67,6 +65,7 @@ public struct StudyDeckRowData: Identifiable, Equatable, Sendable {
         self.learnCount = learnCount
         self.reviewCount = reviewCount
         self.isFiltered = isFiltered
+        self.children = children
     }
 }
 

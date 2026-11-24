@@ -36,6 +36,7 @@ package struct StudyLandingView: View {
             onSelectBook: { bookID in model.selectBook(bookID) },
             onRefresh: { await model.load() }
         )
+        .navigationTitle("Today")
         .sheet(item: $model.selectedBook) { book in
             NavigationStack {
                 ChapterListView(book: book, progress: model.progressCoordinator)
@@ -47,9 +48,17 @@ package struct StudyLandingView: View {
     }
 
     private func beginSession() {
-        // Pick the first deck with due cards (sorted desc by totalDue already).
-        guard case .loaded(_, let decks, _) = model.contentState,
-              let first = decks.first else { return }
-        onSelectDeck(DeckID(first.id))
+        guard case .loaded(_, let decks, _) = model.contentState else { return }
+        var first: StudyDeckRowData?
+        func consider(_ decks: [StudyDeckRowData]) {
+            for deck in decks {
+                if deck.totalDue > (first?.totalDue ?? 0) {
+                    first = deck
+                }
+                consider(deck.children)
+            }
+        }
+        consider(decks)
+        if let first { onSelectDeck(DeckID(first.id)) }
     }
 }

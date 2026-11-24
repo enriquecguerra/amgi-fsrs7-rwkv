@@ -88,6 +88,7 @@ struct ReviewContent: View {
             .reviewHaptics(session: session)
             .navigationBarTitleDisplayMode(.inline)
             #if canImport(UIKit)
+            .gesture(ReviewBackSwipe(isEnabled: keyboardActive, onDismiss: onDismiss))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
