@@ -118,6 +118,7 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         }
         XCTAssertEqual(rows.count, 7, "top-level rows")
         XCTAssertEqual(hero.deckCount, 7)
+        XCTAssertEqual(hero.streak, 365)
         XCTAssertEqual(hero.last14Days, Array(repeating: 80, count: 14))
         XCTAssertEqual(heatmap?.counts.count, 365)
         XCTAssertEqual(heatmap?.counts[0], 80)

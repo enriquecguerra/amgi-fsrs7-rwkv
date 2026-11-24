@@ -28,7 +28,7 @@ final class DeckListModel {
     @ObservationIgnored @Dependency(\.statsClient) private var statsClient
     @ObservationIgnored @Dependency(\.collectionStore) private var store
 
-    /// Publish deck rows first, then fill in the sparkline and the heatmap.
+    /// Publish deck rows first, then fill in the activity displays.
     func load() async {
         await AppSignpost.measure("DeckListLoad") { await loadBody() }
     }
@@ -38,12 +38,15 @@ final class DeckListModel {
         // flashing placeholders over numbers that are still on screen.
         let previousActivity: [Int]?
         let previousHeatmap: HeatmapCardData?
+        let previousStreak: Int
         if case .loaded(_, let hero, let heatmap) = state {
             previousActivity = hero.last14Days
             previousHeatmap = heatmap
+            previousStreak = hero.streak
         } else {
             previousActivity = nil
             previousHeatmap = nil
+            previousStreak = 0
         }
 
         do {
@@ -67,6 +70,7 @@ final class DeckListModel {
                 hero: HeroData(
                     totalDue: totalDue,
                     deckCount: rows.count,
+                    streak: previousStreak,
                     last14Days: previousActivity
                 ),
                 heatmap: previousHeatmap
@@ -79,9 +83,15 @@ final class DeckListModel {
             }
             guard !Task.isCancelled else { return }
             let last14Days = reviews.map { StreakCalculator.lastNDaysTotals(reviews: $0, days: 14) }
+            let streak = reviews.map { StreakCalculator.streak(reviews: $0, window: historyDays) }
             state = .loaded(
                 rows: viewRows,
-                hero: HeroData(totalDue: totalDue, deckCount: rows.count, last14Days: last14Days ?? previousActivity),
+                hero: HeroData(
+                    totalDue: totalDue,
+                    deckCount: rows.count,
+                    streak: streak ?? previousStreak,
+                    last14Days: last14Days ?? previousActivity
+                ),
                 heatmap: reviews.map { Self.buildHeatmap(reviews: $0, days: historyDays) } ?? previousHeatmap ?? .empty
             )
         } catch {

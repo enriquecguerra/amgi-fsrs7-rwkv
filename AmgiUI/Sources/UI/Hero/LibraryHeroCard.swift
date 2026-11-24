@@ -29,7 +29,23 @@ public struct LibraryHeroCard: View {
             bigNumber: "\(data.totalDue)",
             subtitle: subtitleText,
             background: heroGradient,
-            decoration: { EmptyView() },
+            decoration: {
+                if data.streak > 0 {
+                    HStack(spacing: AmgiSpacing.xs) {
+                        Image(systemName: "flame.fill")
+                            .amgiFont(size: 12, weight: .bold, relativeTo: .footnote)
+                        Text("\(data.streak)")
+                            .amgiFont(size: 14, weight: .semibold, relativeTo: .footnote)
+                            .monospacedDigit()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .foregroundStyle(.white)
+                    .background(.white.opacity(0.22), in: Capsule())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(data.streak)-day review streak")
+                }
+            },
             footer: {
                 VStack(spacing: 12) {
                     Button(action: onStartReview) {
@@ -97,6 +113,7 @@ private struct SparklineBars: View {
         data: HeroData(
             totalDue: 680,
             deckCount: 7,
+            streak: 36,
             last14Days: [3, 5, 2, 7, 6, 9, 4, 8, 6, 5, 7, 3, 8, 5]
         ),
         onStartReview: {}
