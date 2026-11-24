@@ -29,7 +29,7 @@ public struct StudyLandingContent: View {
     let onRefresh: () async -> Void
 
     @Environment(\.palette) private var palette
-    @State private var expandedDeckIDs: Set<Int64> = []
+    @SwiftUI.State private var expandedDeckIDs: Set<Int64> = []
 
     public init(
         state: State,
