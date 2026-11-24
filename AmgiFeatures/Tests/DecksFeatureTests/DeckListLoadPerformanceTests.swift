@@ -53,11 +53,11 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         }
     }
 
-    /// Two weeks of review history for the Library sparkline.
+    /// A year of review history for the Library activity displays.
     private static func graphs() -> GraphsSnapshot {
         var snapshot = GraphsSnapshot()
         var counts: [Int: ReviewCountsAndTimes.Reviews] = [:]
-        for offset in -13...0 {
+        for offset in -364...0 {
             counts[offset] = .init(learn: 12, relearn: 3, young: 40, mature: 25, filtered: 0)
         }
         snapshot.reviews = .init(count: counts, time: counts)
@@ -91,7 +91,7 @@ final class DeckListLoadPerformanceTests: XCTestCase {
     // MARK: - Measurements
 
     /// Both phases of `DeckListLoad`: the tree fetch and row mapping, then
-    /// the 14-day activity fold.
+    /// the activity fold.
     func testDeckListLoadPerformance() {
         measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
             let loaded = expectation(description: "deck list loaded")
@@ -113,12 +113,14 @@ final class DeckListLoadPerformanceTests: XCTestCase {
     func testFixtureActuallyLoads() async {
         let model = Self.makeModel()
         await model.load()
-        guard case .loaded(let rows, let hero) = model.state else {
+        guard case .loaded(let rows, let hero, let heatmap) = model.state else {
             return XCTFail("expected .loaded, got \(model.state)")
         }
         XCTAssertEqual(rows.count, 7, "top-level rows")
         XCTAssertEqual(hero.deckCount, 7)
         XCTAssertEqual(hero.last14Days, Array(repeating: 80, count: 14))
+        XCTAssertEqual(heatmap?.counts.count, 365)
+        XCTAssertEqual(heatmap?.counts[0], 80)
     }
 }
 

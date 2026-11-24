@@ -36,15 +36,16 @@ struct MainTabView: View {
             Tab("Today", systemImage: "graduationcap", value: MainTab.today) {
                 NavigationStack {
                     StudyLandingView(onSelectDeck: onSelectStudyDeck)
+                        .modifier(TodayToolbar(
+                            onSwitchProfile: { await switchProfile(to: $0) },
+                            onSync: { startSync() },
+                            onImport: onImport
+                        ))
                 }
             }
             Tab("Library", systemImage: "rectangle.stack", value: MainTab.library) {
                 NavigationStack {
-                    DeckListView(
-                        onSwitchProfile: { await switchProfile(to: $0) },
-                        onSync: { startSync() },
-                        onImport: onImport
-                    )
+                    DeckListView()
                 }
             }
             Tab("Stats", systemImage: "chart.bar", value: MainTab.stats) {

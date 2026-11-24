@@ -28,8 +28,7 @@ final class DeckListModel {
     @ObservationIgnored @Dependency(\.statsClient) private var statsClient
     @ObservationIgnored @Dependency(\.collectionStore) private var store
 
-    /// Publish the decks and due counts first, then fill in the sparkline
-    /// once the review history is ready.
+    /// Publish deck rows first, then fill in the sparkline and the heatmap.
     func load() async {
         await AppSignpost.measure("DeckListLoad") { await loadBody() }
     }
@@ -38,10 +37,13 @@ final class DeckListModel {
         // Carry the previous activity data through a refresh rather than
         // flashing placeholders over numbers that are still on screen.
         let previousActivity: [Int]?
-        if case .loaded(_, let hero) = state {
+        let previousHeatmap: HeatmapCardData?
+        if case .loaded(_, let hero, let heatmap) = state {
             previousActivity = hero.last14Days
+            previousHeatmap = heatmap
         } else {
             previousActivity = nil
+            previousHeatmap = nil
         }
 
         do {
@@ -66,18 +68,21 @@ final class DeckListModel {
                     totalDue: totalDue,
                     deckCount: rows.count,
                     last14Days: previousActivity
-                )
+                ),
+                heatmap: previousHeatmap
             )
 
-            let last14Days = await AppSignpost.measure("DeckListActivity") {
-                let days = 14
-                let graphs = try? await statsClient.fetchGraphs("", days)
-                return StreakCalculator.lastNDaysTotals(reviews: graphs?.reviews.count ?? [:], days: days)
+            let historyDays = 365
+            let reviews = await AppSignpost.measure("DeckListActivity") {
+                let graphs = try? await statsClient.fetchGraphs("", historyDays)
+                return graphs?.reviews.count
             }
             guard !Task.isCancelled else { return }
+            let last14Days = reviews.map { StreakCalculator.lastNDaysTotals(reviews: $0, days: 14) }
             state = .loaded(
                 rows: viewRows,
-                hero: HeroData(totalDue: totalDue, deckCount: rows.count, last14Days: last14Days)
+                hero: HeroData(totalDue: totalDue, deckCount: rows.count, last14Days: last14Days ?? previousActivity),
+                heatmap: reviews.map { Self.buildHeatmap(reviews: $0, days: historyDays) } ?? previousHeatmap ?? .empty
             )
         } catch {
             Log.decks.error("Error loading decks: \(error)")
@@ -100,7 +105,18 @@ final class DeckListModel {
     /// First loaded deck that has cards waiting, projected to a `DeckInfo`
     /// for navigation. Nil while loading/empty or when nothing is due.
     func firstReviewableDeck() -> DeckInfo? {
-        guard case .loaded(let rows, _) = state else { return nil }
+        guard case .loaded(let rows, _, _) = state else { return nil }
         return rows.first(where: { $0.totalCount > 0 })?.asDeckInfo
+    }
+
+    private static func buildHeatmap(
+        reviews: [Int: ReviewCountsAndTimes.Reviews],
+        days: Int
+    ) -> HeatmapCardData {
+        let totals = StreakCalculator.lastNDaysTotals(reviews: reviews, days: days)
+        let counts = Dictionary(uniqueKeysWithValues: totals.enumerated().compactMap { index, count in
+            count > 0 ? (index - days + 1, count) : nil
+        })
+        return HeatmapCardData(counts: counts, maxCount: totals.max() ?? 1)
     }
 }

@@ -25,13 +25,13 @@ package struct SettingsView: View {
 
     /// - Parameter onSwitchProfile: profile switching closes/reopens the
     ///   collection, cancels sync and flips the keychain anchor — composition-
-    ///   root work that lives in `RootFeature/ProfileSwitching.swift`. Same
-    ///   shape as `DeckListView.onSwitchProfile`.
+    ///   root work that lives in `RootFeature/ProfileSwitching.swift`.
     package init(onSwitchProfile: @escaping (AmgiAccount) async -> Void) {
         self.onSwitchProfile = onSwitchProfile
     }
 
     @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
 
     @Environment(\.dictionarySettings) private var dictionarySettings
 
@@ -48,7 +48,7 @@ package struct SettingsView: View {
             }
             .padding(.bottom, AmgiSpacing.xl)
         }
-        .background(palette.background)
+        .background { palette.tabPageBackground(for: colorScheme).ignoresSafeArea() }
         .navigationTitle("Settings")
     }
 

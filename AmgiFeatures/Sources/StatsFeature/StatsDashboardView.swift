@@ -15,6 +15,7 @@ import Dependencies
 
 package struct StatsDashboardView: View {
     @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
 
     private let refreshID: UUID?
 
@@ -44,7 +45,7 @@ package struct StatsDashboardView: View {
             memorised: memorised
         )
         .scrollContentBackground(.hidden)
-        .background(palette.background)
+        .background { palette.tabPageBackground(for: colorScheme).ignoresSafeArea() }
         .navigationTitle("Statistics")
         .task(id: refreshID) { await model.loadDecks() }
         .task(id: query) { await reloadStats() }

@@ -15,7 +15,7 @@ public struct LibraryListContent: View {
         case loading
         case empty
         case failed(String)
-        case loaded(rows: [DeckRowViewData], hero: HeroData)
+        case loaded(rows: [DeckRowViewData], hero: HeroData, heatmap: HeatmapCardData?)
     }
 
     let state: State
@@ -71,13 +71,13 @@ public struct LibraryListContent: View {
                 Button("Try Again") { Task { await onRefresh() } }
                     .buttonStyle(.borderedProminent)
             }
-        case .loaded(let rows, let hero):
-            loadedList(rows: rows, hero: hero)
+        case .loaded(let rows, let hero, let heatmap):
+            loadedList(rows: rows, hero: hero, heatmap: heatmap)
         }
     }
 
     @ViewBuilder
-    private func loadedList(rows: [DeckRowViewData], hero: HeroData) -> some View {
+    private func loadedList(rows: [DeckRowViewData], hero: HeroData, heatmap: HeatmapCardData?) -> some View {
         List {
             Section {
                 LibraryHeroCard(
@@ -123,6 +123,14 @@ public struct LibraryListContent: View {
                 }
             } header: {
                 deckSectionHeader
+            }
+
+            Section {
+                ActivityHeatmapCard(data: heatmap ?? .empty)
+                    .redacted(reason: heatmap == nil ? .placeholder : [])
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
         }
         .libraryListStyle()
@@ -221,7 +229,8 @@ private extension HeroData {
         LibraryListContent(
             state: .loaded(
                 rows: [.sampleKorean, .sampleEnglish, .sampleCS, .sampleEspanol, .sampleFiltered],
-                hero: .samplePopulated
+                hero: .samplePopulated,
+                heatmap: .dense
             ),
             onRefresh: {}, onStartReview: {},
             onTapDeck: { _ in }, onDeleteDeck: { _ in }, onRenameDeck: { _ in }, onCreateDeck: {}
@@ -236,7 +245,8 @@ private extension HeroData {
         LibraryListContent(
             state: .loaded(
                 rows: [.sampleKorean, .sampleEnglish, .sampleCS, .sampleEspanol, .sampleFiltered],
-                hero: .samplePopulated
+                hero: .samplePopulated,
+                heatmap: .dense
             ),
             onRefresh: {}, onStartReview: {},
             onTapDeck: { _ in }, onDeleteDeck: { _ in }, onRenameDeck: { _ in }, onCreateDeck: {}
@@ -252,7 +262,8 @@ private extension HeroData {
             state: .loaded(
                 rows: [.sampleEspanol],
                 hero: HeroData(totalDue: 0, deckCount: 1,
-                               last14Days: Array(repeating: 0, count: 14))
+                               last14Days: Array(repeating: 0, count: 14)),
+                heatmap: .sparse
             ),
             onRefresh: {}, onStartReview: {},
             onTapDeck: { _ in }, onDeleteDeck: { _ in }, onRenameDeck: { _ in }, onCreateDeck: {}

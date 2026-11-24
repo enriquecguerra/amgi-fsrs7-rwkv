@@ -87,6 +87,10 @@ public struct Palette: Sendable, Equatable {
         self.deckGlyph = deckGlyph
         self.shadows = shadows
     }
+
+    public func tabPageBackground(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? .hex(0x000000) : background
+    }
 }
 
 // MARK: - Hex helpers (file-private)
