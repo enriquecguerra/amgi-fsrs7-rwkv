@@ -12,6 +12,8 @@ public struct StudyDueRing: View {
     public let summary: StudySummaryData
 
     @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let ringSize: CGFloat = 200
     private let lineWidth: CGFloat = 18
@@ -24,10 +26,13 @@ public struct StudyDueRing: View {
     public var body: some View {
         ZStack {
             trackCircle
-            accentArc
+            progressArc
             centerContent
         }
         .frame(width: ringSize, height: ringSize)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(summary.totalDue) cards due now")
+        .accessibilityValue(summary.reviewedToday.map { "\($0) reviews completed today" } ?? "")
     }
 
     // MARK: - Track
@@ -38,14 +43,24 @@ public struct StudyDueRing: View {
             .frame(width: ringSize, height: ringSize)
     }
 
-    // MARK: - Accent arc (design-literal: empty on landing)
+    // MARK: - Review progress
 
-    private var accentArc: some View {
+    private var progressArc: some View {
         Circle()
-            .trim(from: 0, to: 0)
-            .stroke(palette.accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            .trim(from: 0, to: progress)
+            .stroke(
+                palette.studyProgressStroke(for: colorScheme),
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+            )
             .rotationEffect(.degrees(-90))
             .frame(width: ringSize, height: ringSize)
+            .animation(reduceMotion ? nil : AmgiMotion.standard, value: progress)
+    }
+
+    private var progress: CGFloat {
+        guard let reviewed = summary.reviewedToday, reviewed > 0 else { return 0 }
+        let completed = CGFloat(reviewed)
+        return completed / (completed + CGFloat(summary.totalDue))
     }
 
     // MARK: - Centre text
@@ -86,7 +101,8 @@ public struct StudyDueRing: View {
         learnCount: 72,
         reviewCount: 75,
         subtitleLabel: "Wednesday · 4 decks due",
-        deckCount: 4
+        deckCount: 4,
+        reviewedToday: 62
     ))
     .padding(32)
     .environment(\.palette, .vividLight)
@@ -99,7 +115,8 @@ public struct StudyDueRing: View {
         learnCount: 0,
         reviewCount: 0,
         subtitleLabel: "Wednesday",
-        deckCount: 0
+        deckCount: 0,
+        reviewedToday: 120
     ))
     .padding(32)
     .environment(\.palette, .vividLight)
@@ -112,10 +129,12 @@ public struct StudyDueRing: View {
         learnCount: 8,
         reviewCount: 24,
         subtitleLabel: "Thursday · 3 decks due",
-        deckCount: 3
+        deckCount: 3,
+        reviewedToday: 30
     ))
     .padding(32)
     .background(Color.black)
     .environment(\.palette, .vividDark)
+    .preferredColorScheme(.dark)
 }
 #endif

@@ -30,6 +30,7 @@ public struct StudyLandingContent: View {
 
     @Environment(\.palette) private var palette
     @SwiftUI.State private var expandedDeckIDs: Set<Int64> = []
+    private let sessionButtonSpacing = AmgiSpacing.xl + AmgiSpacing.xs
 
     public init(
         state: State,
@@ -89,9 +90,9 @@ public struct StudyLandingContent: View {
                     .padding(.bottom, AmgiSpacing.lg)
                 ringHero(summary: summary)
                 beginButton(totalDue: summary.totalDue)
-                    .padding(.top, 20)
-                loadedBody(summary: summary, decks: decks, readingRecs: readingRecs)
-                    .padding(.top, 8)
+                    .padding(.top, sessionButtonSpacing)
+                loadedBody(decks: decks, readingRecs: readingRecs)
+                    .padding(.top, sessionButtonSpacing)
             }
             .padding(.horizontal)
             .padding(.bottom, 24)
@@ -134,13 +135,13 @@ public struct StudyLandingContent: View {
 
     @ViewBuilder
     private func loadedBody(
-        summary: StudySummaryData,
         decks: [StudyDeckRowData],
         readingRecs: [StudyReadingRecData]
     ) -> some View {
         upNextSection(decks: decks)
         if !readingRecs.isEmpty {
             readingRecsSection(readingRecs: readingRecs)
+                .padding(.top, decks.isEmpty ? 0 : AmgiSpacing.xl)
         }
     }
 
@@ -169,7 +170,6 @@ public struct StudyLandingContent: View {
                     }
                 }
             }
-            .padding(.top, 20)
         }
     }
 
@@ -233,7 +233,6 @@ public struct StudyLandingContent: View {
                 .padding(.horizontal, 1)  // prevents clip at edge
             }
         }
-        .padding(.top, 24)
     }
 
     // MARK: - Helpers

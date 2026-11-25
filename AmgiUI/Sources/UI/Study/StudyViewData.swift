@@ -19,6 +19,8 @@ public struct StudySummaryData: Equatable, Sendable {
     public let subtitleLabel: String
     /// Number of decks with cards due — used by ring's "across N decks" subline.
     public let deckCount: Int
+    /// Number of answers logged in the current Anki study day.
+    public let reviewedToday: Int?
 
     public init(
         totalDue: Int,
@@ -26,7 +28,8 @@ public struct StudySummaryData: Equatable, Sendable {
         learnCount: Int,
         reviewCount: Int,
         subtitleLabel: String,
-        deckCount: Int
+        deckCount: Int,
+        reviewedToday: Int? = nil
     ) {
         self.totalDue = totalDue
         self.newCount = newCount
@@ -34,6 +37,7 @@ public struct StudySummaryData: Equatable, Sendable {
         self.reviewCount = reviewCount
         self.subtitleLabel = subtitleLabel
         self.deckCount = deckCount
+        self.reviewedToday = reviewedToday
     }
 }
 

@@ -91,6 +91,10 @@ public struct Palette: Sendable, Equatable {
     public func tabPageBackground(for scheme: ColorScheme) -> Color {
         scheme == .dark ? .hex(0x000000) : background
     }
+
+    public func studyProgressStroke(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : textPrimary
+    }
 }
 
 // MARK: - Hex helpers (file-private)

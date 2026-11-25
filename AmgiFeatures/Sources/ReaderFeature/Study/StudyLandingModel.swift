@@ -29,6 +29,7 @@ final class StudyLandingModel {
 
     @ObservationIgnored @Dependency(\.readerBookClient) private var readerBookClient
     @ObservationIgnored @Dependency(\.collectionStore) private var store
+    @ObservationIgnored @Dependency(\.statsClient) private var statsClient
 
     func load() async {
         do {
@@ -59,18 +60,22 @@ final class StudyLandingModel {
                 subtitleLabel = "\(weekday) · \(deckCount) deck\(deckCount == 1 ? "" : "s") due"
             }
 
+            async let readingRecs = loadReadingRecs()
+            let today = try? await statsClient.fetchGraphs("", 1).today
+            let recommendations = await readingRecs
+            guard !Task.isCancelled else { return }
+
             let summary = StudySummaryData(
                 totalDue: counts.total,
                 newCount: counts.newCount,
                 learnCount: counts.learnCount,
                 reviewCount: counts.reviewCount,
                 subtitleLabel: subtitleLabel,
-                deckCount: deckCount
+                deckCount: deckCount,
+                reviewedToday: today?.answerCount
             )
 
-            let readingRecs = await loadReadingRecs()
-
-            contentState = .loaded(summary: summary, decks: deckRows, readingRecs: readingRecs)
+            contentState = .loaded(summary: summary, decks: deckRows, readingRecs: recommendations)
         } catch {
             Log.reader.error("Error loading: \(error)")
             contentState = .empty
