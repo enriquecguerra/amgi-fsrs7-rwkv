@@ -8,6 +8,19 @@
   An open-source, offline-first Anki-compatible iOS flashcard client with sync server support.
 </p>
 
+> [!TIP]
+> **Personal fork — amgi-rwkv**
+>
+> This is a personal-use fork of [Ivan-Melck/amgi-fsrs7-rwkv](https://github.com/Ivan-Melck/amgi-fsrs7-rwkv), which builds upon the original [Amgi](https://github.com/antigluten/amgi) iOS client. It retains the upstream FSRS-7 and on-device RWKV scheduling support, with changes tailored to my own study workflow:
+>
+> - Redesigned Library and Today screens, with a unified navigation layout, collapsible study decks, and a review progress ring.
+> - Refined review interactions, including edge-swipe navigation, rating feedback, and card rendering adjustments.
+> - Profile renaming without changing sync identity, reorganized settings, and a customized app icon.
+> - Updated [JSchoreels/anki](https://github.com/JSchoreels/anki) backend integration with the Small RWKV model pair (SM92/SM98), corresponding state precision settings, and support for the synced RWKV next-card precomputation preference.
+> - Manual unsigned IPA builds through GitHub Actions, with support for alternative macOS runners and a device-only build path.
+>
+> The personal version lives on the `amgi-ios-personal` branch. To build this version, use that branch and its **Build Unsigned IPA** workflow via **Run workflow** in the Actions tab. The build instructions and project descriptions below are retained from upstream and may differ from this fork's current configuration.
+
 > [!NOTE]
 > **This fork builds Amgi against the [FSRS7/RWKV Anki fork](https://github.com/Ivan-Melck/anki)**
 > (JSchoreels/anki) instead of official Anki. The `anki-upstream` submodule
